@@ -139,6 +139,16 @@ if [ "${ODYSSEUS_LOCAL_LLM:-0}" = "1" ]; then
     gosu "$PUID:$PGID" /app/scripts/local_llm/serve.sh &
 fi
 
+# ASA router (docs/asa/README.md, stage 6): LiteLLM on 127.0.0.1:${ASA_ROUTER_PORT:-4000}
+# fronting asa-deepseek (Colibri / ASA swarm at $ASA_DEEPSEEK_BASE) and asa-fast (the
+# bundled local LLM above). Registering runs first and synchronously so the master key file
+# exists before the proxy reads it. Off by default; enable with ASA_ROUTER=1.
+if [ "${ASA_ROUTER:-0}" = "1" ]; then
+    echo "[entrypoint] starting ASA router..."
+    gosu "$PUID:$PGID" python /app/asa/router/seed_endpoint.py || true
+    gosu "$PUID:$PGID" /app/asa/router/serve.sh &
+fi
+
 # Drop root and run the actual app. `gosu` is preferred over `su` /
 # `sudo` because it cleans up the process tree (no extra shell layer)
 # so signals (SIGTERM from `docker stop`) reach uvicorn directly.
