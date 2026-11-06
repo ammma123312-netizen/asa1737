@@ -180,8 +180,8 @@ python -m asa.planner --hardware workstation-128gb --model glm-5.2 --json
 | 4 | بناء Colibrì وتشغيل Qwen3-Coder-30B فعلياً (4 أنوية / 15 GB)، وقياس السرعة، ومعايرة المخطط | ✅ تم (≈2 رمز/ثانية) |
 | 4ب | تشغيل الورشة `asa-colibri` نفسها على GitHub | ⏭ التالي |
 | 5 | مشغّل ذاتي (حاسوبك بقرص NVMe ≥ 500 GB) لتشغيل GLM-5.2 عبر Issues بالوسم `asa-ask` | ⏭ |
-| 6 | ربط LiteLLM في `docker/entrypoint.sh` خلف متغير `ASA_ROUTER=1` | ⏭ |
-| 7 | ذاكرة مؤقتة دلالية (GPTCache) وموجّه RouteLLM | ⏭ |
+| 6 | ربط LiteLLM في `docker/entrypoint.sh` خلف متغير `ASA_ROUTER=1` (`asa/router/serve.sh`، `seed_endpoint.py`) | ✅ تم (الجلسة المساعدة) |
+| 7 | توجيه تلقائي `asa-auto`: الأسئلة البسيطة إلى `asa-fast`، والصعبة إلى `asa-deepseek` (`asa/router/auto_route.py`). **لم تُضَف الذاكرة المؤقتة الدلالية عمداً**، لأنها قد تعيد جواب سؤال مختلف، فتخالف شرط عدم خسارة الجودة | ✅ تم (الجلسة المساعدة) |
 | 8 | تجربة وضع cluster في Colibrì على جهازين | ⏭ |
 | 9 | نمذجة خطة المستشار (8 GB VRAM) + فك الترميز التخميني في المخطط + عميل Petals لـ Colab | ✅ تم (انظر القسم 8) |
 | 10 | قياس فعلي: llama.cpp + mmap + نموذج مسودة على نفس النموذج المقارن بـ Colibrì | ✅ تم (4.4 رمز/ث، والمسودة +11%) |

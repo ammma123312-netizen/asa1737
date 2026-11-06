@@ -71,7 +71,13 @@ def test_models_match_router_config():
 
 
 def test_register_creates_then_updates_key(tmp_path):
-    pytest.importorskip("sqlalchemy")
+    # register() imports the app's database layer (core.database -> fastapi, httpx, ...):
+    # run it only where the app itself is installed, not in the lightweight asa-ci job.
+    import subprocess as _sp
+    import sys as _sys
+    if _sp.run([_sys.executable, "-c", "import core.database"], cwd=str(SEED.parent.parent.parent),
+               capture_output=True).returncode != 0:
+        pytest.skip("app dependencies (core.database) not installed")
     db = tmp_path / "app.db"
     script = textwrap.dedent(f"""
         import importlib.util, json, sys

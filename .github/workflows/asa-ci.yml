@@ -2,9 +2,9 @@ name: ASA planner
 
 on:
   push:
-    paths: ["asa/**", "tests/test_asa_planner.py", ".github/workflows/asa-*.yml"]
+    paths: ["asa/**", "tests/test_asa_*.py", ".github/workflows/asa-*.yml"]
   pull_request:
-    paths: ["asa/**", "tests/test_asa_planner.py", ".github/workflows/asa-*.yml"]
+    paths: ["asa/**", "tests/test_asa_*.py", ".github/workflows/asa-*.yml"]
   workflow_dispatch:
 
 permissions:
@@ -19,8 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest pytest-asyncio pyyaml
-      - run: python -m pytest tests/test_asa_planner.py -q
+      - run: pip install pytest pytest-asyncio pyyaml requests "PyJWT[crypto]"
+      - run: python -m pytest tests/test_asa_planner.py tests/test_asa_swarm.py tests/test_asa_router.py tests/test_asa_router_auto.py -q
       - name: Feasibility table for this runner
         run: |
           {
