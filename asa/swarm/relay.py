@@ -232,13 +232,32 @@ def self_signed_context(work_dir: str) -> ssl.SSLContext:
     return ctx
 
 
-async def _pipe(reader, writer):
+def _tune(writer) -> None:
+    """Colibri writes each request as many small fields: without TCP_NODELAY every
+    layer can stall on Nagle + delayed ACK through the proxies. Keepalive notices a
+    dead relay instead of hanging."""
+    sock = writer.get_extra_info("socket")
+    if sock is None:
+        return
+    for level, opt in ((socket.IPPROTO_TCP, socket.TCP_NODELAY), (socket.SOL_SOCKET, socket.SO_KEEPALIVE)):
+        try:
+            sock.setsockopt(level, opt, 1)
+        except OSError:
+            pass
+
+
+async def _pipe(reader, writer, label: str = "", log=None):
+    n = 0
     try:
         while data := await reader.read(1 << 16):
             writer.write(data)
             await writer.drain()
-    except (ConnectionError, asyncio.IncompleteReadError):
-        pass
+            n += len(data)
+        if log:
+            log(f"[pipe] {label} closed by peer after {n} B")
+    except Exception as e:  # ssl.SSLError is an OSError, not a ConnectionError
+        if log:
+            log(f"[pipe] {label} error after {n} B: {type(e).__name__}: {e}")
     finally:
         try:
             writer.close()
@@ -246,8 +265,8 @@ async def _pipe(reader, writer):
             pass
 
 
-async def _splice(r1, w1, r2, w2):
-    await asyncio.gather(_pipe(r1, w2), _pipe(r2, w1))
+async def _splice(r1, w1, r2, w2, label: str = "", log=None):
+    await asyncio.gather(_pipe(r1, w2, f"{label} ->", log), _pipe(r2, w1, f"{label} <-", log))
 
 
 async def guard(listen: int, target: int, verify, tls: ssl.SSLContext | None, log=print) -> None:
@@ -267,7 +286,8 @@ async def guard(listen: int, target: int, verify, tls: ssl.SSLContext | None, lo
         await writer.drain()
         log(f"[guard] accepted {peer} job={claims.get('job_workflow_ref', '?')}")
         tr, tw = await asyncio.open_connection("127.0.0.1", target)
-        await _splice(reader, writer, tr, tw)
+        _tune(writer), _tune(tw)
+        await _splice(reader, writer, tr, tw, f"guard {peer}", log)
 
     server = await asyncio.start_server(handle, "127.0.0.1", listen, ssl=tls)
     async with server:
@@ -290,7 +310,9 @@ async def connect(pairs: list[tuple[int, str]], token_fn, tls: bool = True, log=
                 log(f"[connect] {host}:{port} refused us")
                 writer.close()
                 return
-            await _splice(reader, writer, rr, rw)
+            _tune(writer), _tune(rw)
+            log(f"[connect] authenticated to {host}:{port}")
+            await _splice(reader, writer, rr, rw, f"connect {host}:{port}", log)
         return handle
 
     servers = []

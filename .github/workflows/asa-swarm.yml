@@ -135,7 +135,13 @@ jobs:
         run: python -m asa.swarm.rendezvous wait-done --timeout 19000 || true
       - name: Worker logs
         if: always()
-        run: tail -n 30 "$ASA_WORK/guard.log" "$ASA_WORK/worker.log" "$ASA_WORK/hffs.log" "$ASA_WORK"/relay/*.log 2>/dev/null || true
+        run: |
+          mkdir -p wlogs; cp "$ASA_WORK"/guard.log "$ASA_WORK"/worker.log "$ASA_WORK"/relay/*.log wlogs/ 2>/dev/null || true
+          tail -n 5 "$ASA_WORK/hffs.log" > wlogs/hffs-tail.log 2>/dev/null || true
+          tail -n 30 wlogs/* || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "worker-logs-${{ matrix.i }}", path: wlogs, retention-days: 7}
 
   coordinator:
     needs: plan
@@ -226,6 +232,7 @@ jobs:
             answer.txt
             result.json
             engine.err
+            ${{ env.ASA_WORK }}/connect.log
           retention-days: 7
       - name: Release workers
         if: always()

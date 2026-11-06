@@ -4,5 +4,5 @@
  "workers": 4,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A4: 4 workers, delegation verified ([CLUSTER] line), shares fully pre-staged"
+ "stage": "A5: 4 workers, hardened relay (NODELAY, keepalive, all errors logged)"
 }
