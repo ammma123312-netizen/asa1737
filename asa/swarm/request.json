@@ -4,5 +4,5 @@
  "workers": 4,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A7: 4 workers + TCP_NODELAY patch + direct-route probe + per-layer timing"
+ "stage": "A8: 4 workers, experts in RAM (tmpfs) + TCP_NODELAY + direct-route probe + per-layer timing"
 }
