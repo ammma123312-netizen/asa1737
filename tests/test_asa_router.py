@@ -25,7 +25,7 @@ def _load():
 
 @pytest.fixture
 def seed(monkeypatch, tmp_path):
-    for var in ("ASA_ROUTER", "ASA_ROUTER_PORT", "LITELLM_MASTER_KEY", "ODYSSEUS_LOCAL_LLM"):
+    for var in ("ASA_ROUTER", "ASA_ROUTER_AUTO", "ASA_ROUTER_PORT", "LITELLM_MASTER_KEY", "ODYSSEUS_LOCAL_LLM"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("ASA_ROUTER_KEY_FILE", str(tmp_path / "asa_router.key"))
     return _load()
@@ -54,6 +54,8 @@ def test_env_key_wins(seed, monkeypatch, tmp_path):
 def test_models_and_url(seed, monkeypatch):
     assert seed.models() == ["asa-deepseek"]
     monkeypatch.setenv("ODYSSEUS_LOCAL_LLM", "1")
+    assert seed.models() == ["asa-deepseek", "asa-fast", "asa-auto"]
+    monkeypatch.setenv("ASA_ROUTER_AUTO", "0")
     assert seed.models() == ["asa-deepseek", "asa-fast"]
     monkeypatch.setenv("ASA_ROUTER_PORT", "4123")
     assert seed.base_url() == "http://127.0.0.1:4123/v1"
@@ -86,13 +88,14 @@ def test_register_creates_then_updates_key(tmp_path):
     env = dict(os.environ, DATABASE_URL=f"sqlite:///{db}", ASA_ROUTER="1",
                ODYSSEUS_LOCAL_LLM="1", PYTHONPATH=str(ROOT))
     env.pop("ASA_ROUTER_PORT", None)
+    env.pop("ASA_ROUTER_AUTO", None)
     res = subprocess.run([sys.executable, "-c", script], cwd=tmp_path, env=env,
                          capture_output=True, text=True, timeout=120)
     assert res.returncode == 0, res.stderr[-2000:]
     created, unchanged, updated, rows = json.loads(res.stdout.strip().splitlines()[-1])
     assert (created, unchanged, updated) == ("created", "unchanged", "key-updated")
     assert rows == [["ASA Router (LiteLLM)", "http://127.0.0.1:4000/v1", "sk-two",
-                     ["asa-deepseek", "asa-fast"], False]]
+                     ["asa-deepseek", "asa-fast", "asa-auto"], False]]
 
 
 def test_serve_disabled_exits_cleanly():
@@ -110,13 +113,14 @@ def test_serve_execs_litellm_with_shared_key(tmp_path):
     fake.chmod(0o755)
     key_file = tmp_path / "k"
     env = dict(os.environ, ASA_ROUTER="1", ASA_ROUTER_PORT="4555",
-               ASA_ROUTER_KEY_FILE=str(key_file), PATH=f"{fake_bin}:{os.environ['PATH']}")
+               ASA_ROUTER_KEY_FILE=str(key_file), ODYSSEUS_LOCAL_LLM="0", PATH=f"{fake_bin}:{os.environ['PATH']}")
     env.pop("LITELLM_MASTER_KEY", None)
     env.pop("ASA_DEEPSEEK_BASE", None)
     res = subprocess.run(["sh", str(SERVE)], env=env, capture_output=True, text=True, timeout=30)
     assert res.returncode == 0, res.stderr
     lines = dict(line.split(" ", 1) for line in res.stdout.splitlines() if " " in line)
     assert "--host 127.0.0.1 --port 4555" in lines["ARGS"]
+    # ODYSSEUS_LOCAL_LLM unset -> no auto routing -> the source config is used as is.
     assert lines["ARGS"].startswith(f"--config {SERVE.parent}/litellm.yaml")
     assert lines["KEY"] == key_file.read_text().strip()
     assert lines["BASE"] == "http://127.0.0.1:8000/v1"

@@ -9,6 +9,9 @@
 #                         (default http://127.0.0.1:8000/v1)
 #   LITELLM_MASTER_KEY    optional; otherwise read from data/asa_router.key (see seed_endpoint.py)
 #   ASA_ROUTER_INSTALL    1 (default) installs litellm[proxy] with pip --user if it is missing
+#   ASA_ROUTER_AUTO       1 adds the asa-auto model (stage 7, auto_route.py); defaults to
+#                         ODYSSEUS_LOCAL_LLM because it needs asa-fast
+#   ASA_ROUTER_RUN_DIR    where the generated config goes (default ~/.cache/asa-router)
 set -e
 
 if [ "${ASA_ROUTER:-0}" != "1" ]; then
@@ -36,6 +39,8 @@ if ! command -v litellm >/dev/null 2>&1; then
     fi
 fi
 
+CONFIG="$(python "$HERE/build_config.py")"
+
 echo "[asa-router] LiteLLM on 127.0.0.1:$PORT -> asa-deepseek at $ASA_DEEPSEEK_BASE"
 # 127.0.0.1 only: the app is the sole client; public traffic goes through Odysseus.
-exec litellm --config "$HERE/litellm.yaml" --host 127.0.0.1 --port "$PORT"
+exec litellm --config "$CONFIG" --host 127.0.0.1 --port "$PORT"

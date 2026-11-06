@@ -33,6 +33,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 ENDPOINT_NAME = "ASA Router (LiteLLM)"
 DEEPSEEK_ALIAS = "asa-deepseek"
 FAST_ALIAS = "asa-fast"
+AUTO_ALIAS = "asa-auto"
 
 
 def enabled() -> bool:
@@ -73,6 +74,9 @@ def models() -> list[str]:
     # asa-fast points at the bundled llama-cpp server; only offer it when that is running.
     if os.getenv("ODYSSEUS_LOCAL_LLM", "0") == "1":
         names.append(FAST_ALIAS)
+    # Same default as build_config.auto_enabled(): auto routing needs asa-fast.
+    if os.getenv("ASA_ROUTER_AUTO", os.getenv("ODYSSEUS_LOCAL_LLM", "0")) == "1":
+        names.append(AUTO_ALIAS)
     return names
 
 
@@ -84,7 +88,8 @@ def register(key: str) -> str:
 
     Base.metadata.create_all(bind=engine)
     url = base_url()
-    names = json.dumps(models())
+    wanted = models()
+    names = json.dumps(wanted)
     db = SessionLocal()
     try:
         row = db.query(ModelEndpoint).filter(ModelEndpoint.base_url == url).one_or_none()
@@ -106,12 +111,20 @@ def register(key: str) -> str:
             ))
             db.commit()
             return "created"
+        status = "unchanged"
         if row.api_key != key:
             # Key rotated via LITELLM_MASTER_KEY: keep the endpoint working.
             row.api_key = key
+            status = "key-updated"
+        pinned = json.loads(row.pinned_models or "[]")
+        missing = [m for m in wanted if m not in pinned]
+        if missing:
+            # e.g. asa-auto turned on later; add without dropping the admin's own pins.
+            row.pinned_models = json.dumps(pinned + missing)
+            status = "models-updated" if status == "unchanged" else status
+        if status != "unchanged":
             db.commit()
-            return "key-updated"
-        return "unchanged"
+        return status
     finally:
         db.close()
 
