@@ -4,5 +4,5 @@
  "workers": 4,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A5: 4 workers, hardened relay (NODELAY, keepalive, all errors logged)"
+ "stage": "A6: 4 workers, sparse local staging (no FUSE on workers)"
 }

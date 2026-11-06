@@ -201,3 +201,55 @@ def test_artifact_download_drops_auth_on_blob_redirect(monkeypatch):
     from asa.swarm.rendezvous import read_artifact_text
     assert read_artifact_text({"id": 1}) == "bore.pub:4242"
     srv.shutdown()
+
+
+# --- sparse local staging (no FUSE in the hot path) -------------------------
+
+def _write_safetensors(path, tensors):
+    """Minimal safetensors writer: {name: bytes} -> file; returns header dict."""
+    import json as _j
+    import struct as _s
+    header, off = {}, 0
+    for name, blob in tensors.items():
+        header[name] = {"dtype": "U8", "shape": [len(blob)], "data_offsets": [off, off + len(blob)]}
+        off += len(blob)
+    raw = _j.dumps(header).encode()
+    with open(path, "wb") as f:
+        f.write(_s.pack("<Q", len(raw)) + raw + b"".join(tensors.values()))
+    return header, 8 + len(raw)
+
+
+def test_stage_writes_only_selected_tensors_at_original_offsets(tmp_path, monkeypatch):
+    from asa.swarm import stage as st
+    from asa.swarm.hffs import owner_selector
+    monkeypatch.setattr(st, "COALESCE_GAP", 0)  # keep neighbours separate to check holes
+    src = tmp_path / "src"; src.mkdir()
+    tensors = {f"layers.{L}.ffn.experts.{E}.w1.weight": bytes([L * 16 + E + 1]) * 4096
+               for L in range(2) for E in range(4)}
+    tensors["layers.0.attn.wq.weight"] = b"\x07" * 4096
+    header, base = _write_safetensors(src / "model-00001-of-00001.safetensors", tensors)
+    (src / "config.json").write_text("{}")
+    out = tmp_path / "view"
+    st.stage(st.LocalRepo(str(src)), str(out), owner_selector(1, 2), log=lambda m: None)
+    staged = (out / "model-00001-of-00001.safetensors").read_bytes()
+    original = (src / "model-00001-of-00001.safetensors").read_bytes()
+    assert len(staged) == len(original) and staged[:base] == original[:base]   # header intact
+    for name, m in header.items():
+        lo, hi = base + m["data_offsets"][0], base + m["data_offsets"][1]
+        if owner_selector(1, 2)(name):
+            assert staged[lo:hi] == original[lo:hi], name
+        else:
+            assert staged[lo:hi] == b"\0" * (hi - lo), name                 # hole
+    assert (out / "config.json").read_text() == "{}"
+
+
+def test_stage_links_files_from_a_mount(tmp_path):
+    from asa.swarm import stage as st
+    src = tmp_path / "src"; src.mkdir()
+    _write_safetensors(src / "model-00001-of-00002.safetensors", {"layers.0.attn.wq.weight": b"a" * 64})
+    _write_safetensors(src / "model-00002-of-00002.safetensors", {"engram.table": b"b" * 64})
+    out = tmp_path / "view"
+    st.stage(st.LocalRepo(str(src)), str(out), lambda n: True, link_from=str(src),
+             link_globs=["*-00002-of-*"], log=lambda m: None)
+    assert (out / "model-00002-of-00002.safetensors").is_symlink()
+    assert not (out / "model-00001-of-00002.safetensors").is_symlink()

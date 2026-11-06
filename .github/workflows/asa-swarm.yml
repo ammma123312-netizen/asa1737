@@ -110,16 +110,12 @@ jobs:
           df -h / | tail -1
       - name: Preflight (services)
         run: python -m asa.swarm.preflight
-      - name: Node setup + pre-stage this worker's experts
+      - name: Node setup + stage this worker's experts locally (sparse, no FUSE)
         run: |
           k=$(( ${{ matrix.i }} - 1 )); n=${{ needs.plan.outputs.workers }}
-          free=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
-          cache=$(( free > 40 ? free - 10 : 30 ))
-          export HFFS_ARGS="--warm-owner $k/$n --warm-max-gb $(( cache * 8 / 10 ))"
-          CACHE_GB=$cache ./asa/swarm/node_setup.sh
-          L="$HOME/asa-swarm/hffs.log"   # $ASA_WORK only exists from the next step on
-          until grep -q "warm done" "$L"; do sleep 10; if grep -q Traceback "$L"; then cat "$L"; exit 1; fi; done
-          grep warm "$L" | tee -a "$GITHUB_STEP_SUMMARY"
+          ASA_STAGE="--owner $k/$n" ./asa/swarm/node_setup.sh
+          tail -1 "$HOME/asa-swarm/stage.log" | tee -a "$GITHUB_STEP_SUMMARY"
+          df -h / | tail -1
       - name: Start expert worker behind the authenticated guard
         run: |
           CLUSTER_WORKER_CACHE=8 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
@@ -159,13 +155,12 @@ jobs:
         with: {name: swarm-request}
       - name: Preflight (services)
         run: python -m asa.swarm.preflight
-      - name: Node setup (dense tensors + draft head pre-staged)
+      - name: Node setup (dense + draft head staged locally; engram via HFFS)
         run: |
-          export HFFS_ARGS="--warm-include . --warm-exclude ^layers\.[0-9]+\.ffn\.experts\.|engram"
-          CACHE_GB=30 ./asa/swarm/node_setup.sh
-          L="$HOME/asa-swarm/hffs.log"   # $ASA_WORK only exists from the next step on
-          until grep -q "warm done" "$L"; do sleep 10; if grep -q Traceback "$L"; then cat "$L"; exit 1; fi; done
-          grep warm "$L" | tee -a "$GITHUB_STEP_SUMMARY"
+          export ASA_MOUNT=1 CACHE_GB=10
+          export ASA_STAGE="--include . --exclude ^layers\.[0-9]+\.ffn\.experts\.|engram --link-from $HOME/asa-swarm/mnt --link *-0004[78]-of-*"
+          ./asa/swarm/node_setup.sh
+          tail -1 "$HOME/asa-swarm/stage.log" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Wait for workers, authenticated tunnels, probe
         env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: |

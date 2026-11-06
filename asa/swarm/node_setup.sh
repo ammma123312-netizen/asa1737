@@ -30,17 +30,33 @@ echo "[node] python env"
 [ -x "$WORK/venv/bin/python" ] || python3 -m venv "$WORK/venv"
 "$WORK/venv/bin/pip" install -q fusepy requests transformers tokenizers numpy sympy
 
-echo "[node] mount $REPO (HFFS, cache ${CACHE_GB} GB)"
-mkdir -p "$WORK/mnt" "$WORK/cache"
-(cd "$HERE" && nohup "$WORK/venv/bin/python" -m asa.swarm.hffs "$REPO" "$WORK/mnt" \
-    --cache "$WORK/cache" --cache-gb "$CACHE_GB" --small-block '*-0004[78]-of-*' --small-block-kb 4 --readahead 0 \
-    ${HFFS_ARGS:-} > "$WORK/hffs.log" 2>&1 &)
-for _ in $(seq 1 60); do [ -f "$WORK/mnt/config.json" ] && break; sleep 2; done
-[ -f "$WORK/mnt/config.json" ] || { cat "$WORK/hffs.log"; exit 1; }
-head -1 "$WORK/hffs.log"
+mount_hffs() {
+    echo "[node] mount $REPO (HFFS, cache ${CACHE_GB} GB)"
+    mkdir -p "$WORK/mnt" "$WORK/cache"
+    (cd "$HERE" && nohup "$WORK/venv/bin/python" -m asa.swarm.hffs "$REPO" "$WORK/mnt" \
+        --cache "$WORK/cache" --cache-gb "$CACHE_GB" --small-block '*-0004[78]-of-*' --small-block-kb 4 --readahead 0 \
+        ${HFFS_ARGS:-} > "$WORK/hffs.log" 2>&1 &)
+    for _ in $(seq 1 60); do [ -f "$WORK/mnt/config.json" ] && break; sleep 2; done
+    [ -f "$WORK/mnt/config.json" ] || { cat "$WORK/hffs.log"; exit 1; }
+    head -1 "$WORK/hffs.log"
+}
 
-echo "[node] writable view + Colibrì $ENGINE"
-"$WORK/venv/bin/python" -c "import sys; sys.path.insert(0, '$HERE'); from asa.swarm.hffs import make_view; print(make_view('$WORK/mnt', '$WORK/view'), 'files linked')"
+if [ -n "${ASA_STAGE:-}" ]; then
+    # Sparse local staging: this node's tensors at their real offsets, holes elsewhere.
+    # The engine then reads local disk; FUSE stays only for files linked from the mount
+    # (the coordinator's engram tables). ASA_MOUNT=1 mounts HFFS first for those links.
+    [ "${ASA_MOUNT:-0}" = "1" ] && mount_hffs
+    echo "[node] stage: $ASA_STAGE"
+    set -f   # the stage arguments carry globs/regexes; do not let the shell expand them
+    (cd "$HERE" && "$WORK/venv/bin/python" -m asa.swarm.stage "$REPO" "$WORK/view" $ASA_STAGE) | tee "$WORK/stage.log"
+    set +f
+else
+    mount_hffs
+    echo "[node] writable view"
+    "$WORK/venv/bin/python" -c "import sys; sys.path.insert(0, '$HERE'); from asa.swarm.hffs import make_view; print(make_view('$WORK/mnt', '$WORK/view'), 'files linked')"
+fi
+
+echo "[node] Colibrì $ENGINE"
 [ -d "$WORK/colibri/.git" ] || git clone -q https://github.com/JustVugg/colibri "$WORK/colibri"
 git -C "$WORK/colibri" checkout -q "$COLIBRI_REF"
 (cd "$WORK/colibri/c" && ./setup.sh >/dev/null && make -s "$ENGINE")
