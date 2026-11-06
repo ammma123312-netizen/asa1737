@@ -246,10 +246,53 @@ def _tune(writer) -> None:
             pass
 
 
-async def _pipe(reader, writer, label: str = "", log=None):
+class ReplyTimer:
+    """Request -> first reply byte latency on one spliced connection.
+
+    Colibri's cluster protocol is strictly request/reply per layer, so the time from
+    the first byte going out (coordinator -> worker) to the first byte coming back is
+    one layer's round trip: network + the worker's compute. Measured on the
+    coordinator's `connect` it includes the relay; on the worker's `guard` it is the
+    worker alone. The difference is the network."""
+
+    def __init__(self, label: str, log=None, every: float = 60.0):
+        self.label, self.log, self.every = label, log, every
+        self.t0 = None
+        self.samples: list[float] = []
+        self.last_report = time.monotonic()
+
+    def outgoing(self):
+        if self.t0 is None:
+            self.t0 = time.monotonic()
+
+    def incoming(self):
+        if self.t0 is not None:
+            self.samples.append(time.monotonic() - self.t0)
+            self.t0 = None
+            if time.monotonic() - self.last_report >= self.every:
+                self.report()
+
+    def summary(self) -> dict:
+        xs = sorted(self.samples)
+        if not xs:
+            return {"n": 0}
+        pick = lambda q: xs[min(len(xs) - 1, int(q * len(xs)))]  # noqa: E731
+        return {"n": len(xs), "mean_ms": round(1000 * sum(xs) / len(xs), 1),
+                "p50_ms": round(1000 * pick(0.5), 1), "p95_ms": round(1000 * pick(0.95), 1),
+                "total_s": round(sum(xs), 1)}
+
+    def report(self):
+        self.last_report = time.monotonic()
+        if self.log:
+            self.log(f"[timing] {self.label} {json.dumps(self.summary())}")
+
+
+async def _pipe(reader, writer, label: str = "", log=None, on_data=None):
     n = 0
     try:
         while data := await reader.read(1 << 16):
+            if on_data:
+                on_data()
             writer.write(data)
             await writer.drain()
             n += len(data)
@@ -266,10 +309,17 @@ async def _pipe(reader, writer, label: str = "", log=None):
 
 
 async def _splice(r1, w1, r2, w2, label: str = "", log=None):
-    await asyncio.gather(_pipe(r1, w2, f"{label} ->", log), _pipe(r2, w1, f"{label} <-", log))
+    """r1/w1 face the requester (Colibri's coordinator side), r2/w2 the responder."""
+    timer = ReplyTimer(label, log)
+    try:
+        await asyncio.gather(_pipe(r1, w2, f"{label} ->", log, timer.outgoing),
+                             _pipe(r2, w1, f"{label} <-", log, timer.incoming))
+    finally:
+        timer.report()
 
 
-async def guard(listen: int, target: int, verify, tls: ssl.SSLContext | None, log=print) -> None:
+async def guard(listen: int, target: int, verify, tls: ssl.SSLContext | None, log=print,
+                bind: str = "127.0.0.1") -> None:
     """Worker side: authenticate, then forward to Colibri's local port."""
     async def handle(reader, writer):
         peer = writer.get_extra_info("peername")
@@ -289,7 +339,7 @@ async def guard(listen: int, target: int, verify, tls: ssl.SSLContext | None, lo
         _tune(writer), _tune(tw)
         await _splice(reader, writer, tr, tw, f"guard {peer}", log)
 
-    server = await asyncio.start_server(handle, "127.0.0.1", listen, ssl=tls)
+    server = await asyncio.start_server(handle, bind, listen, ssl=tls)
     async with server:
         await server.serve_forever()
 
@@ -342,6 +392,8 @@ def main(argv=None) -> int:
     g = sub.add_parser("guard")
     g.add_argument("--listen", type=int, default=9200)
     g.add_argument("--target", type=int, default=9100)
+    g.add_argument("--bind", default="127.0.0.1",
+                   help="0.0.0.0 lets other runners try a direct (still authenticated) connection")
     g.add_argument("--work-dir", default=os.path.expanduser("~/asa-swarm/guard"))
     c = sub.add_parser("connect")
     c.add_argument("--addrs", required=True)
@@ -351,7 +403,7 @@ def main(argv=None) -> int:
     if a.cmd == "guard":
         verify = make_verifier(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_RUN_ID"])
         asyncio.run(guard(a.listen, a.target, verify, self_signed_context(a.work_dir),
-                          log=lambda m: print(m, flush=True)))
+                          log=lambda m: print(m, flush=True), bind=a.bind))
         return 0
     if a.cmd == "connect":
         addrs = [x for x in a.addrs.split(",") if x]

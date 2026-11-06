@@ -253,3 +253,23 @@ def test_stage_links_files_from_a_mount(tmp_path):
              link_globs=["*-00002-of-*"], log=lambda m: None)
     assert (out / "model-00002-of-00002.safetensors").is_symlink()
     assert not (out / "model-00001-of-00002.safetensors").is_symlink()
+
+
+def test_reply_timer_measures_request_to_first_reply():
+    import time as _t
+    from asa.swarm.relay import ReplyTimer
+    t = ReplyTimer("x", every=1e9)
+    t.outgoing(); t.outgoing(); _t.sleep(0.02); t.incoming(); t.incoming()  # 2nd incoming: no request
+    s = t.summary()
+    assert s["n"] == 1 and s["p50_ms"] >= 15
+
+
+def test_worker_artifact_relay_and_direct_routes():
+    from asa.swarm.rendezvous import parse_worker, pick_route, workers_by_index
+    w = parse_worker("relay bore.pub:4000\ndirect 10.1.0.4:9200\ndirect 20.1.2.3:9200\n")
+    assert w == {"relay": "bore.pub:4000", "direct": ["10.1.0.4:9200", "20.1.2.3:9200"]}
+    assert pick_route(w, lambda a: a.startswith("20.")) == ("20.1.2.3:9200", "direct")
+    assert pick_route(w, lambda a: False) == ("bore.pub:4000", "relay")
+    assert parse_worker("bore.pub:5\n")["relay"] == "bore.pub:5"            # older format
+    named = [("swarm-addr-2", "relay b:2"), ("swarm-addr-1", "relay b:1\ndirect 10.0.0.1:9200")]
+    assert [x["relay"] for x in workers_by_index(named)] == ["b:1", "b:2"]

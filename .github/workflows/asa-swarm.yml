@@ -26,7 +26,7 @@ on:
     inputs:
       prompt: {description: "Prompt", default: "ما هي عاصمة المملكة العربية السعودية؟"}
       ngen: {description: "Tokens to generate", default: "64"}
-      workers: {description: "Expert workers (1..16)", default: "16"}
+      workers: {description: "Expert workers (1..19)", default: "19"}
       relay: {description: "Relay order", default: "bore,cloudflare"}
   push:
     paths: ["asa/swarm/request.json"]
@@ -78,7 +78,7 @@ jobs:
           elif ev == "issues":
               req.update(prompt=os.environ["ISSUE_BODY"], issue=int(os.environ["ISSUE_NUMBER"]))
           n = int(req["workers"])
-          assert 1 <= n <= 16, "workers must be 1..16 (V41_CLUSTER_MAX_WORKERS in Colibri)"
+          assert 1 <= n <= 19, "workers must be 1..19 (free plan: 20 concurrent jobs incl. the coordinator)"
           json.dump(req, open("request.resolved.json", "w"), ensure_ascii=False, indent=1)
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               # "runner": "ubuntu-latest" (free) or "asa" (your own PCs, docs/asa/SELF_HOSTED.md)
@@ -125,9 +125,16 @@ jobs:
           CLUSTER_WORKER_CACHE=8 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
             > "$ASA_WORK/worker.log" 2>&1 &
           for _ in $(seq 1 90); do (echo > /dev/tcp/127.0.0.1/9100) 2>/dev/null && break; sleep 2; done
-          nohup python -m asa.swarm.relay guard --listen 9200 --target 9100 > "$ASA_WORK/guard.log" 2>&1 &
+          # The guard (TLS + OIDC) listens on every interface so the coordinator can try a
+          # direct connection; nothing reaches Colibri without this run's token either way.
+          nohup python -m asa.swarm.relay guard --listen 9200 --target 9100 --bind 0.0.0.0 > "$ASA_WORK/guard.log" 2>&1 &
           for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/9200) 2>/dev/null && break; sleep 1; done
-          python -m asa.swarm.relay expose --port 9200 --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay" | tee addr.txt
+          relay=$(python -m asa.swarm.relay expose --port 9200 --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay")
+          {
+            echo "relay $relay"
+            for ip in $(hostname -I); do echo "direct $ip:9200"; done
+            pub=$(curl -s --max-time 10 https://api.ipify.org || true); [ -n "$pub" ] && echo "direct $pub:9200"
+          } | tee addr.txt
       - uses: actions/upload-artifact@v4
         with: {name: "swarm-addr-${{ matrix.i }}", path: addr.txt, retention-days: 1}
       - name: Serve until the coordinator finishes
@@ -168,7 +175,8 @@ jobs:
       - name: Wait for workers, authenticated tunnels, probe
         env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: |
-          raw=$(python -m asa.swarm.rendezvous wait-workers --count ${{ needs.plan.outputs.workers }} --timeout 3600 --min 1)
+          raw=$(python -m asa.swarm.rendezvous wait-workers --count ${{ needs.plan.outputs.workers }} --timeout 3600 --min 1 --direct 2> rendezvous.log)
+          grep "worker " rendezvous.log | tee -a "$GITHUB_STEP_SUMMARY" || true
           bridged=$(python -m asa.swarm.relay bridge --addrs "$raw" --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay")
           nohup python -m asa.swarm.relay connect --addrs "$bridged" > "$ASA_WORK/connect.out" 2> "$ASA_WORK/connect.log" &
           for _ in $(seq 1 30); do [ -s "$ASA_WORK/connect.out" ] && break; sleep 1; done
@@ -241,6 +249,7 @@ jobs:
             answer.txt
             result.json
             engine.err
+            rendezvous.log
             ${{ env.ASA_WORK }}/connect.log
           retention-days: 7
       - name: Release workers

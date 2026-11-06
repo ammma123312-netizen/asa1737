@@ -59,6 +59,8 @@ fi
 echo "[node] Colibrì $ENGINE"
 [ -d "$WORK/colibri/.git" ] || git clone -q https://github.com/JustVugg/colibri "$WORK/colibri"
 git -C "$WORK/colibri" checkout -q "$COLIBRI_REF"
+# TCP_NODELAY on the cluster sockets + 32-worker limit (see asa/swarm/patch_colibri.py)
+(cd "$HERE" && python3 -m asa.swarm.patch_colibri "$WORK/colibri/c/deepseek_v41.c")
 (cd "$WORK/colibri/c" && ./setup.sh >/dev/null && make -s "$ENGINE")
 if [ "$ENGINE" = "deepseek_v41" ]; then
     (cd "$WORK/colibri" && "$WORK/venv/bin/python" c/tools/prepare_dsv41.py --model "$WORK/view" | tail -1)

@@ -1,8 +1,8 @@
 {
- "prompt": "اكتب دالة بايثون تحسب عدد كل حلول مسألة الملكات الثماني (8 ملكات على رقعة 8×8 بحيث لا تهاجم أي ملكة الأخرى) باستخدام التراجع (backtracking)، ثم اشرح الخوارزمية خطوة بخطوة باختصار، واذكر في النهاية العدد الصحيح للحلول.",
- "ngen": 450,
- "workers": 16,
+ "prompt": "ما هي عاصمة المملكة العربية السعودية؟",
+ "ngen": 8,
+ "workers": 4,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "B: 16 workers, sparse staging, hard task (8-queens, expected answer 92)"
+ "stage": "A7: 4 workers + TCP_NODELAY patch + direct-route probe + per-layer timing"
 }

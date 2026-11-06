@@ -85,30 +85,74 @@ def parse_addresses(texts: list[str]) -> list[str]:
     return sorted(out)
 
 
+def parse_worker(text: str) -> dict:
+    """A worker's artifact: `relay HOST:PORT` and any number of `direct HOST:PORT` lines.
+    A bare HOST:PORT line (older workers) counts as the relay."""
+    out: dict = {"relay": None, "direct": []}
+    for line in text.splitlines():
+        kind, _, addr = line.strip().rpartition(" ")
+        if not parse_addresses([addr]):
+            continue
+        if kind == "direct":
+            out["direct"].append(addr)
+        elif out["relay"] is None:
+            out["relay"] = addr
+    return out
+
+
+def pick_route(worker: dict, reachable) -> tuple[str, str]:
+    """Prefer a direct address the coordinator can open (still authenticated by the
+    worker's guard), else the relay. Returns (address, 'direct'|'relay')."""
+    for addr in worker["direct"]:
+        if reachable(addr):
+            return addr, "direct"
+    return worker["relay"], "relay"
+
+
+def tcp_reachable(addr: str, timeout: float = 3.0) -> bool:
+    import socket
+    host, port = addr.rsplit(":", 1)
+    try:
+        socket.create_connection((host, int(port)), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
 def order_by_index(named: list[tuple[str, str]]) -> list[str]:
     """[(artifact name, text)] -> addresses ordered by the worker index in the name.
 
     Order matters: Colibri gives worker k (position in --cluster-workers) the experts
     with (expert + layer) % n == k, and each worker prefetched exactly that share
     (hffs --warm-owner k/n). Worker i (1-based matrix index) must sit at position i-1."""
+    return [w["relay"] for w in workers_by_index(named)]
+
+
+def workers_by_index(named: list[tuple[str, str]]) -> list[dict]:
     rows = []
     for name, text in named:
         idx = name[len(ADDR_PREFIX):]
-        addr = parse_addresses([text])
-        if idx.isdigit() and addr:
-            rows.append((int(idx), addr[0]))
-    return [a for _, a in sorted(rows)]
+        w = parse_worker(text)
+        if idx.isdigit() and w["relay"]:
+            rows.append((int(idx), w))
+    return [w for _, w in sorted(rows, key=lambda r: r[0])]
 
 
-def wait_workers(count: int, timeout: float, poll: float = 15) -> list[str]:
+def wait_workers(count: int, timeout: float, poll: float = 15, direct: bool = False) -> list[str]:
     deadline = time.time() + timeout
     while True:
         arts = [a for a in list_artifacts() if a["name"].startswith(ADDR_PREFIX)]
-        addrs = order_by_index([(a["name"], read_artifact_text(a)) for a in arts])
-        print(f"[rendezvous] {len(addrs)}/{count} workers", file=sys.stderr, flush=True)
-        if len(addrs) >= count or time.time() > deadline:
-            return addrs
+        workers = workers_by_index([(a["name"], read_artifact_text(a)) for a in arts])
+        print(f"[rendezvous] {len(workers)}/{count} workers", file=sys.stderr, flush=True)
+        if len(workers) >= count or time.time() > deadline:
+            break
         time.sleep(poll)
+    if not direct:
+        return [w["relay"] for w in workers]
+    chosen = [pick_route(w, tcp_reachable) for w in workers]
+    for i, (addr, how) in enumerate(chosen):
+        print(f"[rendezvous] worker {i + 1}: {how} {addr}", file=sys.stderr, flush=True)
+    return [a for a, _ in chosen]
 
 
 def wait_done(timeout: float, poll: float = 30) -> bool:
@@ -127,11 +171,12 @@ def main(argv=None) -> int:
     w.add_argument("--count", type=int, required=True)
     w.add_argument("--timeout", type=float, default=1800)
     w.add_argument("--min", type=int, default=1, help="fail if fewer than this reported")
+    w.add_argument("--direct", action="store_true", help="use a worker's direct address when reachable")
     d = sub.add_parser("wait-done")
     d.add_argument("--timeout", type=float, default=20000)
     a = ap.parse_args(argv)
     if a.cmd == "wait-workers":
-        addrs = wait_workers(a.count, a.timeout)
+        addrs = wait_workers(a.count, a.timeout, direct=a.direct)
         if len(addrs) < a.min:
             print(f"only {len(addrs)} workers reported", file=sys.stderr)
             return 1
