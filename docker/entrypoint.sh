@@ -149,6 +149,15 @@ if [ "${ASA_ROUTER:-0}" = "1" ]; then
     gosu "$PUID:$PGID" /app/asa/router/serve.sh &
 fi
 
+# ASA swarm bridge: model `asa-swarm` on 127.0.0.1:${ASA_SWARM_PORT:-4100} that asks the
+# GitHub-Actions swarm through `asa-ask` issues and answers asynchronously (asa/swarm/bridge.py).
+# Off by default. Needs ASA_SWARM_REPO and ASA_GITHUB_TOKEN (the user's own token, env only).
+if [ "${ASA_SWARM:-0}" = "1" ]; then
+    echo "[entrypoint] starting ASA swarm bridge..."
+    (cd /app && gosu "$PUID:$PGID" python -m asa.swarm.bridge register) || true
+    (cd /app && exec gosu "$PUID:$PGID" python -m asa.swarm.bridge serve) &
+fi
+
 # Drop root and run the actual app. `gosu` is preferred over `su` /
 # `sudo` because it cleans up the process tree (no extra shell layer)
 # so signals (SIGTERM from `docker stop`) reach uvicorn directly.
