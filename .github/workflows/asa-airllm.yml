@@ -1,0 +1,72 @@
+name: ASA AirLLM run (experimental)
+
+# AirLLM (https://github.com/lyogavin/airllm) loads a *dense* model one layer
+# at a time, so peak memory is roughly one layer. It is designed around a
+# GPU; CPU inference exists since v2.10.1 but is slow. On a free runner use
+# it to measure layer-streaming cost on a small model, not for chat.
+# For dense 70B+ models use a GPU self-hosted runner (`runner` input).
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Hugging Face model id (dense)"
+        default: "Qwen/Qwen2.5-0.5B-Instruct"
+      prompt:
+        default: "Name the capital of Saudi Arabia."
+      max_new_tokens:
+        default: "20"
+      compression:
+        description: "none, 4bit or 8bit (4/8bit need a CUDA GPU)"
+        type: choice
+        default: none
+        options: [none, 4bit, 8bit]
+      runner:
+        default: ubuntu-latest
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    env:
+      MODEL: ${{ inputs.model }}
+      PROMPT: ${{ inputs.prompt }}
+      MAX_NEW: ${{ inputs.max_new_tokens }}
+      COMPRESSION: ${{ inputs.compression }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu || pip install -q torch
+          pip install -q airllm
+          if [ "$COMPRESSION" != "none" ]; then pip install -q -U bitsandbytes; fi
+      - name: Generate
+        run: |
+          python - <<'EOF' | tee "$RUNNER_TEMP/out.txt"
+          import os, time
+          from airllm import AutoModel
+          kw = {"profiling_mode": True}
+          if os.environ["COMPRESSION"] != "none":
+              kw["compression"] = os.environ["COMPRESSION"]
+          t0 = time.time()
+          model = AutoModel.from_pretrained(os.environ["MODEL"], **kw)
+          t1 = time.time()
+          ids = model.tokenizer([os.environ["PROMPT"]], return_tensors="pt",
+                                return_attention_mask=False, truncation=True,
+                                max_length=128, padding=False)["input_ids"]
+          out = model.generate(ids.to(model.device), max_new_tokens=int(os.environ["MAX_NEW"]),
+                               use_cache=True, return_dict_in_generate=True)
+          t2 = time.time()
+          print(model.tokenizer.decode(out.sequences[0]))
+          print(f"load+split: {t1-t0:.1f}s  generate: {t2-t1:.1f}s  "
+                f"({int(os.environ['MAX_NEW'])/(t2-t1):.3f} tok/s)")
+          EOF
+      - name: Report
+        if: always()
+        run: |
+          { echo "## AirLLM: $MODEL"; echo '```'; tail -n 40 "$RUNNER_TEMP/out.txt" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

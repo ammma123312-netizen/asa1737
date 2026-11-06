@@ -1,0 +1,157 @@
+name: ASA Colibri run
+
+# Runs a MoE model with Colibrì (https://github.com/JustVugg/colibri), which
+# streams experts from disk so the model can be much bigger than RAM.
+#
+# What fits where (see `python -m asa.planner --list`):
+#   * free ubuntu-latest (16 GB RAM, ~70 GB disk after cleanup):
+#       qwen3-coder-30b-a3b (19 GB) or qwen3.6-35b-a3b (23 GB)
+#   * DeepSeek-V4.1-Flash 763B native (510 GB) and GLM-5.2 (429 GB int4) need a larger runner or a
+#     self-hosted runner with a big NVMe disk; set `runner` accordingly.
+#     The planner gate below stops the job before a download that cannot fit.
+#
+# Two ways to use it:
+#   1. Actions tab -> "ASA Colibri run" -> Run workflow.
+#   2. Open an issue, put the question in the body, add the label `asa-ask`.
+#      The answer is posted as a comment when generation finishes (async, so
+#      a slow big model is fine).
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Model to run"
+        type: choice
+        default: qwen3-coder-30b-a3b
+        options: [qwen3-coder-30b-a3b, qwen3.6-35b-a3b, deepseek-v4.1-flash-native, glm-5.2]
+      prompt:
+        description: "Prompt"
+        default: "Write a Python function that checks whether a number is prime."
+      ngen:
+        description: "Max new tokens"
+        default: "128"
+      runner:
+        description: "runs-on label (ubuntu-latest, a larger-runner label, or self-hosted)"
+        default: ubuntu-latest
+      hardware:
+        description: "Planner hardware preset for the runner"
+        type: choice
+        default: gha-free-public
+        options: [gha-free-public, gha-larger-64core, desktop-nvme-64gb, workstation-128gb]
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  COLIBRI_REF: 0a5504a1dc64f86fcd0fe7db298b0448c730e7e6  # pinned; bump deliberately
+
+jobs:
+  run:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'asa-ask'
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 340
+    env:
+      MODEL: ${{ github.event_name == 'workflow_dispatch' && inputs.model || 'qwen3-coder-30b-a3b' }}
+      HARDWARE: ${{ github.event_name == 'workflow_dispatch' && inputs.hardware || 'gha-free-public' }}
+      NGEN: ${{ github.event_name == 'workflow_dispatch' && inputs.ngen || '256' }}
+      # Untrusted text: only ever read through env, never interpolated into a script.
+      PROMPT: ${{ github.event_name == 'workflow_dispatch' && inputs.prompt || github.event.issue.body }}
+      MODEL_DIR: ${{ github.workspace }}/../models
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve model
+        run: |
+          case "$MODEL" in
+            qwen3-coder-30b-a3b) echo "HF_REPO=Justvugg/Qwen3-Coder-30B-A3B-colibri-int4" >> "$GITHUB_ENV"; echo "ENGINE=qwen36" >> "$GITHUB_ENV" ;;
+            qwen3.6-35b-a3b)     echo "HF_REPO=Kreuzzelg/qwen36-35b-a3b-colibri-i4-gs64" >> "$GITHUB_ENV"; echo "ENGINE=qwen36" >> "$GITHUB_ENV" ;;
+            glm-5.2)             echo "HF_REPO=mastouri/GLM-5.2-colibri-int4-g64-with-int8-mtp" >> "$GITHUB_ENV"; echo "ENGINE=glm" >> "$GITHUB_ENV" ;;
+            deepseek-v4.1-flash-native) echo "HF_REPO=deepseek-ai/DeepSeek-V4.1-Flash" >> "$GITHUB_ENV"; echo "ENGINE=deepseek_v41" >> "$GITHUB_ENV" ;;
+            *) echo "unknown model $MODEL"; exit 1 ;;
+          esac
+
+      - name: Free disk space (GitHub-hosted only)
+        if: runner.environment == 'github-hosted'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost || true
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
+
+      - name: Planner gate
+        run: |
+          pip install -q pyyaml
+          free_gb=$(df --output=avail -BG "$GITHUB_WORKSPACE/.." | tail -1 | tr -dc 0-9)
+          python -m asa.planner --hardware "$HARDWARE" --model "$MODEL" --disk-gb "$free_gb" | tee plan.txt
+          python -m asa.planner --hardware "$HARDWARE" --model "$MODEL" --disk-gb "$free_gb" --json > plan.json
+          python -c "import json,sys; p=json.load(open('plan.json'))[0]; sys.exit(1 if p['mode']=='impossible' else 0)" \
+            || { echo "::error::$MODEL cannot run on this runner — see plan above. Use a larger or self-hosted runner."; exit 1; }
+
+      - name: Build Colibrì
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq build-essential libgomp1
+          git clone https://github.com/JustVugg/colibri "$RUNNER_TEMP/colibri"
+          git -C "$RUNNER_TEMP/colibri" checkout -q "$COLIBRI_REF"
+          cd "$RUNNER_TEMP/colibri/c"
+          ./setup.sh
+          make -s "$ENGINE"
+
+      - name: Download weights
+        run: |
+          pip install -q "huggingface_hub[hf_transfer]"
+          export HF_HUB_ENABLE_HF_TRANSFER=1
+          mkdir -p "$MODEL_DIR/$MODEL"
+          python - <<'EOF'
+          import os
+          from huggingface_hub import snapshot_download
+          snapshot_download(os.environ["HF_REPO"], local_dir=os.path.join(os.environ["MODEL_DIR"], os.environ["MODEL"]))
+          EOF
+          du -sh "$MODEL_DIR/$MODEL"; df -h /
+
+      - name: Prepare DeepSeek-V4.1 engram sidecar
+        if: env.ENGINE == 'deepseek_v41'
+        working-directory: ${{ runner.temp }}/colibri
+        run: |
+          pip install -q transformers tokenizers numpy sympy
+          python c/tools/prepare_dsv41.py --model "$MODEL_DIR/$MODEL"
+
+      - name: Doctor
+        working-directory: ${{ runner.temp }}/colibri/c
+        run: ./coli doctor --model "$MODEL_DIR/$MODEL" || true
+
+      - name: Generate
+        working-directory: ${{ runner.temp }}/colibri/c
+        run: |
+          start=$(date +%s)
+          ./coli run --model "$MODEL_DIR/$MODEL" --ngen "$NGEN" "$PROMPT" | tee "$RUNNER_TEMP/answer.txt"
+          echo "ELAPSED=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## ASA Colibri: $MODEL on \`$HARDWARE\`"
+            echo '```'; cat plan.txt 2>/dev/null; echo '```'
+            echo "Wall time for generation: ${ELAPSED:-n/a} s (ngen=$NGEN)"
+            echo '```'; cat "$RUNNER_TEMP/answer.txt" 2>/dev/null; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Answer the issue
+        if: github.event_name == 'issues' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          {
+            echo "**$MODEL** (Colibrì, ${ELAPSED}s):"; echo
+            cat "$RUNNER_TEMP/answer.txt"; echo
+            echo "---"; echo "_Generated by the ASA Colibri workflow_"
+          } > comment.md
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file comment.md

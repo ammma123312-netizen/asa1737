@@ -1,0 +1,930 @@
+# ASA project catalog: open-source tools for running very large models on
+# limited hardware, and for hiding the latency that comes with it.
+# Arabic explanations live in docs/asa/README.md.
+#
+# quality: lossless = output identical to the original model (or bit-exact under greedy)
+#          lossy    = trades accuracy for speed/size (quantization, sparsity
+#                     prediction, weaker-model routing, fuzzy cache hits)
+#          depends  = engine is exact; quality is set by the weights you load
+#
+# solves: memory  = run a model bigger than RAM/VRAM
+#         speed   = more tokens per second
+#         latency = faster first answer / fewer slow calls
+#         scale   = spread one model over several machines
+#         quality = measure or guarantee output quality
+
+categories:
+  streaming: "Run models bigger than memory"
+  quantization: "Shrink the weights"
+  serving: "Fast inference engines"
+  distributed: "Split one model across machines"
+  latency: "Hide or avoid slow generations"
+  platform: "Packaging and local model servers"
+  kernels: "Low-level kernels that make the same math faster"
+  moe-offload: "Expert/weight offloading research systems"
+  speculative: "Exact speculative decoding (draft then verify)"
+  kv-cache: "KV-cache reuse, transfer or compression"
+  evaluation: "Prove an optimisation kept quality"
+  infra: "Storage, download, networking and free/cheap compute"
+  models: "Reference model repositories and deployment code"
+
+projects:
+  # --- streaming / offload -------------------------------------------------
+  - name: Colibrì
+    repo: JustVugg/colibri
+    quality: depends
+    category: streaming
+    solves: [memory, scale]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Streams MoE experts from NVMe; GLM-5.2 (744B) on ~25 GB RAM. Has a cluster mode."
+  - name: AirLLM
+    repo: lyogavin/airllm
+    quality: lossless
+    category: streaming
+    solves: [memory]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Layer-by-layer loading of dense models; 70B on a 4 GB GPU, 405B on 8 GB VRAM. Very slow."
+  - name: llama.cpp
+    repo: ggml-org/llama.cpp
+    quality: depends
+    category: streaming
+    solves: [memory, speed]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Reference CPU/GPU engine. mmap lets the OS page in weights that do not fit in RAM."
+  - name: ik_llama.cpp
+    repo: ikawrakow/ik_llama.cpp
+    quality: depends
+    category: streaming
+    solves: [speed, memory]
+    openai_api: true
+    cpu_only_ok: true
+    role: "llama.cpp fork with faster CPU kernels and MoE tensor-override tricks for huge models."
+  - name: KTransformers
+    repo: kvcache-ai/ktransformers
+    quality: depends
+    category: streaming
+    solves: [memory, speed]
+    openai_api: true
+    cpu_only_ok: false
+    role: "CPU/GPU hybrid for giant MoEs: experts on CPU, attention on one GPU (DeepSeek 671B on 24 GB VRAM)."
+  - name: PowerInfer
+    repo: SJTU-IPADS/PowerInfer
+    quality: lossy
+    category: streaming
+    solves: [speed, memory]
+    openai_api: false
+    cpu_only_ok: true
+    role: "Keeps 'hot' neurons on GPU and 'cold' on CPU by exploiting activation sparsity."
+  - name: FlexLLMGen
+    repo: FMInference/FlexLLMGen
+    quality: depends
+    category: streaming
+    solves: [memory]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Offloads weights/KV across GPU, CPU and disk; optimised for high-throughput batch jobs."
+  - name: DeepSpeed (ZeRO-Inference)
+    repo: deepspeedai/DeepSpeed
+    quality: lossless
+    category: streaming
+    solves: [memory, scale]
+    openai_api: false
+    cpu_only_ok: false
+    role: "ZeRO-Inference streams weights from CPU/NVMe into the GPU for models far bigger than VRAM."
+
+  # --- quantization --------------------------------------------------------
+  - name: BitNet.cpp
+    repo: microsoft/BitNet
+    quality: depends
+    category: quantization
+    solves: [memory, speed]
+    openai_api: false
+    cpu_only_ok: true
+    role: "1.58-bit (ternary) inference on CPU; several times faster and far smaller than FP16."
+  - name: Unsloth (dynamic GGUF quants)
+    repo: unslothai/unsloth
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    openai_api: false
+    cpu_only_ok: true
+    role: "Dynamic 1.58-2.5 bit GGUFs that shrink DeepSeek-R1 671B from 720 GB to ~131 GB."
+  - name: HQQ
+    repo: mobiusml/hqq
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Calibration-free fast quantization (1-8 bit); quantize a 70B in minutes."
+  - name: GPTQModel
+    repo: ModelCloud/GPTQModel
+    quality: lossy
+    category: quantization
+    solves: [memory, speed]
+    openai_api: false
+    cpu_only_ok: true
+    role: "GPTQ/AWQ-style 4-bit quantization toolkit with CPU and GPU kernels."
+  - name: LLM Compressor
+    repo: vllm-project/llm-compressor
+    quality: lossy
+    category: quantization
+    solves: [memory, speed]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Produces FP8/INT4/AWQ checkpoints that vLLM serves at full speed."
+
+  # --- fast serving --------------------------------------------------------
+  - name: vLLM
+    repo: vllm-project/vllm
+    quality: lossless
+    category: serving
+    solves: [speed, scale]
+    openai_api: true
+    cpu_only_ok: true
+    role: "PagedAttention + continuous batching; the throughput standard on GPUs."
+  - name: SGLang
+    repo: sgl-project/sglang
+    quality: lossless
+    category: serving
+    solves: [speed, latency]
+    openai_api: true
+    cpu_only_ok: false
+    role: "RadixAttention prefix reuse; very fast for agents and repeated prompts."
+  - name: ExLlamaV3
+    repo: turboderp-org/exllamav3
+    quality: lossy
+    category: serving
+    solves: [speed, memory]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Fastest single-user GPU decoding with EXL3 quantization at fractional bitrates."
+  - name: mistral.rs
+    repo: EricLBuehler/mistral.rs
+    quality: depends
+    category: serving
+    solves: [speed]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Rust engine with ISQ (in-situ quantization), paged attention and speculative decoding."
+  - name: MLC LLM
+    repo: mlc-ai/mlc-llm
+    quality: depends
+    category: serving
+    solves: [speed]
+    openai_api: true
+    cpu_only_ok: false
+    role: "Compiles models for any GPU, phones and the browser (WebGPU)."
+
+  # --- distributed ---------------------------------------------------------
+  - name: Petals
+    repo: bigscience-workshop/petals
+    quality: lossless
+    category: distributed
+    solves: [scale, memory]
+    openai_api: false
+    cpu_only_ok: false
+    role: "BitTorrent-style: each volunteer serves a few layers of a huge model."
+  - name: exo
+    repo: exo-explore/exo
+    quality: lossless
+    category: distributed
+    solves: [scale, memory]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Pools phones, laptops and Macs on a LAN into one inference cluster."
+  - name: distributed-llama
+    repo: b4rtaz/distributed-llama
+    quality: depends
+    category: distributed
+    solves: [scale, speed]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Tensor-parallel CPU inference over Ethernet; more devices = more tokens/s."
+
+  # --- latency hiding ------------------------------------------------------
+  - name: EAGLE (speculative decoding)
+    repo: SafeAILab/EAGLE
+    quality: lossless
+    category: latency
+    solves: [speed]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Draft head guesses several tokens, the big model verifies them in one pass (2-3x)."
+  - name: LMCache
+    repo: LMCache/LMCache
+    quality: lossless
+    category: latency
+    solves: [latency]
+    openai_api: false
+    cpu_only_ok: false
+    role: "Stores and reuses KV cache across requests so repeated context is not recomputed."
+  - name: GPTCache
+    repo: zilliztech/GPTCache
+    quality: lossy
+    category: latency
+    solves: [latency]
+    openai_api: false
+    cpu_only_ok: true
+    role: "Semantic cache: a similar question gets the stored answer instantly."
+  - name: LiteLLM
+    repo: BerriAI/litellm
+    quality: depends
+    category: latency
+    solves: [latency, scale]
+    openai_api: true
+    cpu_only_ok: true
+    role: "One OpenAI endpoint in front of every backend, with fallbacks, timeouts and load balancing."
+  - name: RouteLLM
+    repo: lm-sys/RouteLLM
+    quality: lossy
+    category: latency
+    solves: [latency, speed]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Learned router: easy questions go to the small fast model, hard ones to the big model."
+
+  # --- platform ------------------------------------------------------------
+  - name: Ollama
+    repo: ollama/ollama
+    quality: depends
+    category: platform
+    solves: [speed]
+    openai_api: true
+    cpu_only_ok: true
+    role: "One-command local model server; easiest way to run the fast small tier."
+  - name: LocalAI
+    repo: mudler/LocalAI
+    quality: depends
+    category: platform
+    solves: [scale]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Drop-in OpenAI-compatible server with many backends and P2P federation."
+  - name: llamafile
+    repo: Mozilla-Ocho/llamafile
+    quality: depends
+    category: platform
+    solves: [speed]
+    openai_api: true
+    cpu_only_ok: true
+    role: "Single executable per model with fast CPU matmul kernels; trivial to ship on a runner."
+
+  # --- expansion (2026-11): repos verified with git ls-remote ---------------
+  - name: TensorRT-LLM
+    repo: NVIDIA/TensorRT-LLM
+    quality: depends
+    category: serving
+    solves: [speed,scale]
+    role: "NVIDIA's compiled engine; fastest on NVIDIA GPUs, FP8/FP4 kernels"
+  - name: Text Generation Inference
+    repo: huggingface/text-generation-inference
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Hugging Face's production server"
+  - name: LMDeploy
+    repo: InternLM/lmdeploy
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "TurboMind engine; strong MoE and quantized serving"
+  - name: ExLlamaV2
+    repo: turboderp-org/exllamav2
+    quality: lossy
+    category: serving
+    solves: [speed,memory]
+    role: "EXL2 mixed-bit GPU inference"
+  - name: Aphrodite Engine
+    repo: aphrodite-engine/aphrodite-engine
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "vLLM-based server with many quant formats"
+  - name: TabbyAPI
+    repo: theroyallab/tabbyAPI
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "OpenAI-compatible server for ExLlama"
+  - name: Candle
+    repo: huggingface/candle
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Minimal Rust ML framework for inference"
+  - name: ZML
+    repo: zml/zml
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Zig/MLIR inference stack targeting many accelerators"
+  - name: MNN
+    repo: alibaba/MNN
+    quality: depends
+    category: serving
+    solves: [speed,memory]
+    role: "Mobile/edge inference engine (MNN-LLM)"
+  - name: ONNX Runtime GenAI
+    repo: microsoft/onnxruntime-genai
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Generation loop for ONNX Runtime on CPU/GPU/NPU"
+  - name: OpenVINO GenAI
+    repo: openvinotoolkit/openvino.genai
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Intel CPU/GPU/NPU optimised generation"
+  - name: MLX LM
+    repo: ml-explore/mlx-lm
+    quality: depends
+    category: serving
+    solves: [speed,scale]
+    role: "Apple-silicon inference; distributed over several Macs"
+  - name: IPEX-LLM
+    repo: intel/ipex-llm
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Intel CPU/GPU acceleration for llama.cpp, vLLM, Ollama"
+  - name: DeepSpeed-MII
+    repo: deepspeedai/DeepSpeed-MII
+    quality: lossless
+    category: serving
+    solves: [speed]
+    role: "DeepSpeed-FastGen serving with blocked KV and SplitFuse"
+  - name: Xinference
+    repo: xorbitsai/inference
+    quality: depends
+    category: platform
+    solves: [scale]
+    role: "Unified serving layer over many backends and clusters"
+  - name: GPUStack
+    repo: gpustack/gpustack
+    quality: depends
+    category: platform
+    solves: [scale]
+    role: "Manage a heterogeneous GPU cluster; includes llama.cpp RPC distribution"
+  - name: FastChat
+    repo: lm-sys/FastChat
+    quality: depends
+    category: platform
+    solves: [scale]
+    role: "Controller/worker serving and the Chatbot Arena stack"
+  - name: KoboldCpp
+    repo: LostRuins/koboldcpp
+    quality: depends
+    category: platform
+    solves: [memory]
+    role: "Single-file llama.cpp fork with offload controls"
+  - name: LitGPT
+    repo: Lightning-AI/litgpt
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Hackable implementations of 20+ LLMs"
+  - name: gpt-fast
+    repo: pytorch-labs/gpt-fast
+    quality: lossless
+    category: serving
+    solves: [speed]
+    role: "Pure-PyTorch reference for compile + speculative decoding"
+  - name: FlashInfer
+    repo: flashinfer-ai/flashinfer
+    quality: lossless
+    category: kernels
+    solves: [speed]
+    role: "Attention/sampling kernels used by vLLM and SGLang"
+  - name: FlashAttention
+    repo: Dao-AILab/flash-attention
+    quality: lossless
+    category: kernels
+    solves: [speed]
+    role: "IO-aware exact attention"
+  - name: FlashMLA
+    repo: deepseek-ai/FlashMLA
+    quality: lossless
+    category: kernels
+    solves: [speed]
+    role: "DeepSeek's MLA decoding kernels"
+  - name: DeepGEMM
+    repo: deepseek-ai/DeepGEMM
+    quality: lossless
+    category: kernels
+    solves: [speed]
+    role: "DeepSeek's FP8 GEMM kernels (native-precision math)"
+  - name: DeepEP
+    repo: deepseek-ai/DeepEP
+    quality: lossless
+    category: kernels
+    solves: [scale]
+    role: "Expert-parallel all-to-all communication for MoE"
+  - name: 3FS
+    repo: deepseek-ai/3FS
+    quality: lossless
+    category: infra
+    solves: [memory,speed]
+    role: "DeepSeek's distributed file system for SSD-backed KV/weights"
+  - name: EPLB
+    repo: deepseek-ai/EPLB
+    quality: lossless
+    category: kernels
+    solves: [scale]
+    role: "Expert-parallel load balancer (replicates hot experts)"
+  - name: DeepSeek Open Infra
+    repo: deepseek-ai/open-infra-index
+    quality: lossless
+    category: infra
+    solves: [speed]
+    role: "Index of DeepSeek's released inference infrastructure"
+  - name: Mooncake
+    repo: kvcache-ai/Mooncake
+    quality: lossless
+    category: kv-cache
+    solves: [latency,scale]
+    role: "KV-cache-centric disaggregated serving (Kimi's platform)"
+  - name: NVIDIA Dynamo
+    repo: ai-dynamo/dynamo
+    quality: lossless
+    category: serving
+    solves: [scale,latency]
+    role: "Disaggregated prefill/decode serving framework"
+  - name: NIXL
+    repo: ai-dynamo/nixl
+    quality: lossless
+    category: infra
+    solves: [speed]
+    role: "Inference transfer library for KV/weight movement"
+  - name: llm-d
+    repo: llm-d/llm-d
+    quality: lossless
+    category: serving
+    solves: [scale]
+    role: "Kubernetes-native distributed vLLM serving"
+  - name: vLLM Production Stack
+    repo: vllm-project/production-stack
+    quality: lossless
+    category: serving
+    solves: [scale]
+    role: "Reference multi-node vLLM deployment with LMCache"
+  - name: AIBrix
+    repo: vllm-project/aibrix
+    quality: lossless
+    category: serving
+    solves: [scale]
+    role: "Control plane for large-scale vLLM inference"
+  - name: TileLang
+    repo: tile-ai/tilelang
+    quality: lossless
+    category: kernels
+    solves: [speed]
+    role: "DSL for writing fast GPU kernels"
+  - name: Triton
+    repo: triton-lang/triton
+    quality: lossless
+    category: kernels
+    solves: [speed]
+    role: "Language/compiler for custom GPU kernels"
+  - name: torchao
+    repo: pytorch/ao
+    quality: lossy
+    category: quantization
+    solves: [memory,speed]
+    role: "PyTorch-native quantization and sparsity"
+  - name: Optimum
+    repo: huggingface/optimum
+    quality: depends
+    category: quantization
+    solves: [speed]
+    role: "Hardware-specific export and optimisation"
+  - name: Optimum Quanto
+    repo: huggingface/optimum-quanto
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    role: "Simple int2/4/8 and float8 quantization"
+  - name: bitsandbytes
+    repo: bitsandbytes-foundation/bitsandbytes
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    role: "8-bit and 4-bit (NF4) quantization"
+  - name: Marlin
+    repo: IST-DASLab/marlin
+    quality: lossy
+    category: kernels
+    solves: [speed]
+    role: "Fast 4-bit GEMM kernels for batched inference"
+  - name: AQLM
+    repo: Vahe1994/AQLM
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    role: "Additive quantization for 2-bit models"
+  - name: QuIP#
+    repo: Cornell-RelaxML/quip-sharp
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    role: "Lattice-codebook 2-bit quantization"
+  - name: AWQ
+    repo: mit-han-lab/llm-awq
+    quality: lossy
+    category: quantization
+    solves: [memory,speed]
+    role: "Activation-aware 4-bit weight quantization"
+  - name: SmoothQuant
+    repo: mit-han-lab/smoothquant
+    quality: lossy
+    category: quantization
+    solves: [speed]
+    role: "W8A8 quantization"
+  - name: OmniServe (QServe)
+    repo: mit-han-lab/omniserve
+    quality: lossy
+    category: serving
+    solves: [speed]
+    role: "W4A8KV4 serving system"
+  - name: StreamingLLM
+    repo: mit-han-lab/streaming-llm
+    quality: lossy
+    category: kv-cache
+    solves: [memory]
+    role: "Attention sinks for unbounded streams (drops context)"
+  - name: T-MAC
+    repo: microsoft/T-MAC
+    quality: depends
+    category: kernels
+    solves: [speed]
+    role: "Lookup-table low-bit kernels for CPUs"
+  - name: AutoRound
+    repo: intel/auto-round
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    role: "Sign-gradient rounding for 2-8 bit models"
+  - name: TensorRT Model Optimizer
+    repo: NVIDIA/TensorRT-Model-Optimizer
+    quality: lossy
+    category: quantization
+    solves: [speed]
+    role: "FP8/FP4/INT4 quantization and sparsity toolkit"
+  - name: AutoAWQ
+    repo: casper-hansen/AutoAWQ
+    quality: lossy
+    category: quantization
+    solves: [memory]
+    role: "AWQ quantization (archived; superseded by llm-compressor)"
+  - name: Fiddler
+    repo: efeslab/fiddler
+    quality: lossless
+    category: moe-offload
+    solves: [memory,speed]
+    role: "Runs MoE experts on CPU instead of copying them to GPU"
+  - name: MoE-Infinity
+    repo: EfficientMoE/MoE-Infinity
+    quality: lossless
+    category: moe-offload
+    solves: [memory,speed]
+    role: "Activation-aware expert prefetching and caching"
+  - name: Mixtral offloading
+    repo: dvmazur/mixtral-offloading
+    quality: depends
+    category: moe-offload
+    solves: [memory]
+    role: "LRU expert cache + speculative expert loading"
+  - name: Medusa
+    repo: FasterDecoding/Medusa
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Extra decoding heads propose several tokens per step"
+  - name: Lookahead Decoding
+    repo: hao-ai-lab/LookaheadDecoding
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Jacobi-iteration n-gram drafting, no draft model"
+  - name: Prompt Lookup Decoding
+    repo: apoorvumang/prompt-lookup-decoding
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Drafts from n-grams already in the prompt"
+  - name: Sequoia
+    repo: Infini-AI-Lab/Sequoia
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Hardware-aware draft trees, built for offloaded models"
+  - name: TriForce
+    repo: Infini-AI-Lab/TriForce
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Hierarchical speculation for long context"
+  - name: SpecInfer (FlexFlow)
+    repo: flexflow/FlexFlow
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Tree-based speculative inference and verification"
+  - name: Spec-Bench
+    repo: hemingkx/Spec-Bench
+    quality: lossless
+    category: evaluation
+    solves: [speed]
+    role: "Benchmark comparing speculative decoding methods"
+  - name: SpecForge
+    repo: sgl-project/SpecForge
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Train EAGLE-3 draft heads for SGLang"
+  - name: REST
+    repo: FasterDecoding/REST
+    quality: lossless
+    category: speculative
+    solves: [speed]
+    role: "Retrieval-based drafting from a datastore"
+  - name: kvpress
+    repo: NVIDIA/kvpress
+    quality: lossy
+    category: kv-cache
+    solves: [memory]
+    role: "KV-cache compression methods"
+  - name: H2O
+    repo: FMInference/H2O
+    quality: lossy
+    category: kv-cache
+    solves: [memory]
+    role: "Heavy-hitter KV eviction"
+  - name: Quest
+    repo: mit-han-lab/Quest
+    quality: lossy
+    category: kv-cache
+    solves: [speed]
+    role: "Query-aware sparse KV loading for long context"
+  - name: Hivemind
+    repo: learning-at-home/hivemind
+    quality: lossless
+    category: distributed
+    solves: [scale]
+    role: "DHT/P2P library under Petals"
+  - name: prima.cpp
+    repo: OpenCPIL/prima.cpp
+    quality: depends
+    category: distributed
+    solves: [scale,memory]
+    role: "llama.cpp across heterogeneous home devices (70B on home clusters)"
+  - name: Cake
+    repo: evilsocket/cake
+    quality: lossless
+    category: distributed
+    solves: [scale]
+    role: "Rust inference sharded across phones, PCs and GPUs"
+  - name: Ray
+    repo: ray-project/ray
+    quality: lossless
+    category: distributed
+    solves: [scale]
+    role: "Cluster runtime used by vLLM multi-node and Ray Serve"
+  - name: SkyPilot
+    repo: skypilot-org/skypilot
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Launch on the cheapest cloud/spot GPUs with one config"
+  - name: Portkey Gateway
+    repo: Portkey-AI/gateway
+    quality: depends
+    category: latency
+    solves: [latency,scale]
+    role: "AI gateway: fallbacks, retries, load balancing over 200+ providers"
+  - name: One API
+    repo: songquanpeng/one-api
+    quality: depends
+    category: latency
+    solves: [scale]
+    role: "Key/quota management across many LLM APIs"
+  - name: Arch Gateway
+    repo: katanemo/archgw
+    quality: depends
+    category: latency
+    solves: [latency]
+    role: "Edge proxy with routing for agents"
+  - name: RedisVL
+    repo: redis/redis-vl-python
+    quality: lossy
+    category: latency
+    solves: [latency]
+    role: "Semantic cache and router on Redis"
+  - name: lm-evaluation-harness
+    repo: EleutherAI/lm-evaluation-harness
+    quality: lossless
+    category: evaluation
+    solves: [quality]
+    role: "Measure that an optimisation did not lose accuracy"
+  - name: simple-evals
+    repo: openai/simple-evals
+    quality: lossless
+    category: evaluation
+    solves: [quality]
+    role: "Lightweight reference evals (MMLU, GPQA, MATH)"
+  - name: LightEval
+    repo: huggingface/lighteval
+    quality: lossless
+    category: evaluation
+    solves: [quality]
+    role: "Evaluate any backend (vLLM, TGI, endpoints)"
+  - name: OpenCompass
+    repo: open-compass/opencompass
+    quality: lossless
+    category: evaluation
+    solves: [quality]
+    role: "Large evaluation suite, strong Chinese/Arabic coverage"
+  - name: EvalPlus
+    repo: evalplus/evalplus
+    quality: lossless
+    category: evaluation
+    solves: [quality]
+    role: "Rigorous code-generation evaluation"
+  - name: hf_transfer
+    repo: huggingface/hf_transfer
+    quality: lossless
+    category: infra
+    solves: [speed]
+    role: "Rust parallel downloader for Hub files"
+  - name: huggingface_hub
+    repo: huggingface/huggingface_hub
+    quality: lossless
+    category: infra
+    solves: [speed]
+    role: "Hub client; HfFileSystem for streaming reads"
+  - name: Xet core
+    repo: huggingface/xet-core
+    quality: lossless
+    category: infra
+    solves: [speed]
+    role: "Chunk-deduplicated storage behind fast Hub transfers"
+  - name: rclone
+    repo: rclone/rclone
+    quality: lossless
+    category: infra
+    solves: [memory]
+    role: "Mount remote/HTTP storage as a disk (weights larger than local disk)"
+  - name: fsspec
+    repo: fsspec/filesystem_spec
+    quality: lossless
+    category: infra
+    solves: [memory]
+    role: "Filesystem abstraction with FUSE mounting and block caching"
+  - name: liburing
+    repo: axboe/liburing
+    quality: lossless
+    category: infra
+    solves: [speed]
+    role: "io_uring for async NVMe reads"
+  - name: GitHub Actions Runner
+    repo: actions/runner
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Self-hosted runner: turn your server into a free CI worker"
+  - name: Free Disk Space action
+    repo: jlumbroso/free-disk-space
+    quality: lossless
+    category: infra
+    solves: [memory]
+    role: "Reclaims ~30-60 GB on GitHub-hosted runners"
+  - name: Tailscale
+    repo: tailscale/tailscale
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Mesh VPN to join free/NAT'd machines into one cluster"
+  - name: cloudflared
+    repo: cloudflare/cloudflared
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Expose a local OpenAI endpoint without opening ports"
+  - name: Kaggle API
+    repo: Kaggle/kaggle-api
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Script free Kaggle GPU sessions"
+  - name: Colab tools
+    repo: googlecolab/colabtools
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Colab runtime helpers"
+  - name: Modal client
+    repo: modal-labs/modal-client
+    quality: lossless
+    category: infra
+    solves: [scale]
+    role: "Serverless GPUs with monthly free credits"
+  - name: Open WebUI
+    repo: open-webui/open-webui
+    quality: lossless
+    category: platform
+    solves: [latency]
+    role: "Chat UI for any OpenAI-compatible endpoint"
+  - name: Megatron-LM
+    repo: NVIDIA/Megatron-LM
+    quality: lossless
+    category: distributed
+    solves: [scale]
+    role: "Tensor/expert parallel reference implementation"
+  - name: DeepSeek-V3 reference
+    repo: deepseek-ai/DeepSeek-V3
+    quality: lossless
+    category: models
+    solves: [quality]
+    role: "Reference inference code incl. FP8 weights"
+  - name: GLM-4.5 reference
+    repo: zai-org/GLM-4.5
+    quality: lossless
+    category: models
+    solves: [quality]
+    role: "GLM MoE family reference and deployment notes"
+  - name: Kimi K2 reference
+    repo: MoonshotAI/Kimi-K2
+    quality: lossless
+    category: models
+    solves: [quality]
+    role: "Kimi K2 deployment guide (native INT4)"
+  - name: Transformers
+    repo: huggingface/transformers
+    quality: lossless
+    category: serving
+    solves: [quality]
+    role: "Reference implementations; ground truth for correctness"
+  - name: Accelerate
+    repo: huggingface/accelerate
+    quality: lossless
+    category: moe-offload
+    solves: [memory]
+    role: "device_map offloading of weights to CPU/disk"
+  - name: OpenLM
+    repo: mlfoundations/open_lm
+    quality: lossless
+    category: models
+    solves: [quality]
+    role: "Open LM training/inference codebase"
+  - name: llama-cpp-python
+    repo: abetlen/llama-cpp-python
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "Python bindings + OpenAI server for llama.cpp"
+  - name: ggml
+    repo: ggml-org/ggml
+    quality: depends
+    category: kernels
+    solves: [speed]
+    role: "Tensor library under llama.cpp"
+  - name: RamaLama
+    repo: containers/ramalama
+    quality: depends
+    category: platform
+    solves: [scale]
+    role: "Run models in containers with llama.cpp/vLLM"
+  - name: Jan
+    repo: janhq/jan
+    quality: depends
+    category: platform
+    solves: [latency]
+    role: "Offline desktop assistant with local server"
+  - name: lms (LM Studio CLI)
+    repo: lmstudio-ai/lms
+    quality: depends
+    category: platform
+    solves: [latency]
+    role: "CLI for LM Studio's local server"
+  - name: GPT4All
+    repo: nomic-ai/gpt4all
+    quality: depends
+    category: platform
+    solves: [latency]
+    role: "Desktop local LLM app"
+  - name: ExecuTorch
+    repo: pytorch/executorch
+    quality: depends
+    category: serving
+    solves: [speed]
+    role: "On-device PyTorch inference"
+  - name: TinyChatEngine
+    repo: mit-han-lab/TinyChatEngine
+    quality: lossy
+    category: serving
+    solves: [memory]
+    role: "On-device W4A16 engine"

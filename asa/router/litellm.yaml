@@ -1,0 +1,47 @@
+# ASA router — zero cost: no subscriptions, no provider keys, local endpoints only.
+#
+#   asa-deepseek -> DeepSeek-V4.1-Flash 763B (native weights, token-exact) served by Colibri,
+#                   either on one machine reading weights through HFFS, or as the coordinator
+#                   of an ASA swarm (docs/asa/README.md section 12)
+#   asa-fast     -> small local model for instant answers (lower quality, opt-in)
+#
+# LITELLM_MASTER_KEY is not a subscription: it is any random string you choose so the proxy
+# is not open to anyone on your network. The app sends it as its API key.
+#
+# Run:  export LITELLM_MASTER_KEY=$(openssl rand -hex 16)
+#       ASA_DEEPSEEK_BASE=http://127.0.0.1:8000/v1 litellm --config asa/router/litellm.yaml --port 4000
+# App:  LLM_HOSTS=localhost:4000
+
+model_list:
+  - model_name: asa-deepseek
+    litellm_params:
+      model: openai/deepseek-v4.1-flash   # coli serve --model-id deepseek-v4.1-flash
+      api_base: os.environ/ASA_DEEPSEEK_BASE
+      api_key: "none"
+      # Streaming 763B from disk or network: minutes per long answer.
+      timeout: 7200
+      stream_timeout: 1800
+
+  - model_name: asa-fast
+    litellm_params:
+      model: openai/qwen2.5-3b-instruct
+      api_base: http://127.0.0.1:8001/v1
+      api_key: "none"
+      timeout: 120
+
+router_settings:
+  num_retries: 0
+  # Colibri serves one conversation per KV slot; queue rather than overload it.
+  max_parallel_requests: 2
+
+general_settings:
+  # Recent LiteLLM refuses to start an unauthenticated proxy.
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  # Exact-match cache only: identical request -> identical stored answer (lossless).
+  cache: true
+  cache_params:
+    type: local
+    ttl: 86400
+  request_timeout: 7200
