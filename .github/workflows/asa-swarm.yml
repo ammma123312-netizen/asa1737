@@ -26,7 +26,7 @@ on:
     inputs:
       prompt: {description: "Prompt", default: "ما هي عاصمة المملكة العربية السعودية؟"}
       ngen: {description: "Tokens to generate", default: "64"}
-      workers: {description: "Expert workers (1..18)", default: "16"}
+      workers: {description: "Expert workers (1..16)", default: "16"}
       relay: {description: "Relay order", default: "bore,cloudflare"}
   push:
     paths: ["asa/swarm/request.json"]
@@ -77,7 +77,7 @@ jobs:
           elif ev == "issues":
               req.update(prompt=os.environ["ISSUE_BODY"], issue=int(os.environ["ISSUE_NUMBER"]))
           n = int(req["workers"])
-          assert 1 <= n <= 18, "workers must be 1..18 (free plan: 20 concurrent jobs)"
+          assert 1 <= n <= 16, "workers must be 1..16 (V41_CLUSTER_MAX_WORKERS in Colibri)"
           json.dump(req, open("request.resolved.json", "w"), ensure_ascii=False, indent=1)
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"matrix={json.dumps(list(range(1, n + 1)))}\nworkers={n}\n"
@@ -173,9 +173,15 @@ jobs:
         run: |
           key="${ASA_API_KEY:-$(python -c 'import secrets;print(secrets.token_hex(16))')}"
           echo "::add-mask::$key"; echo "LOCAL_KEY=$key" >> "$GITHUB_ENV"
-          V41_DIRECT=0 V41_STATS=1 nohup "$COLI" serve --model "$VIEW" --model-id deepseek-v4.1-flash \
+          # coli serve forwards --cluster-workers to the engine only for GLM-5.3; the
+          # dsv41 engine reads CLUSTER_WORKERS from its environment, so export it.
+          CLUSTER_WORKERS="$WORKERS" V41_DIRECT=0 V41_STATS=1 nohup "$COLI" serve --model "$VIEW" --model-id deepseek-v4.1-flash \
             --host 127.0.0.1 --port 8000 --api-key "$key" --cluster-workers "$WORKERS" \
             --cap 2 --ctx 4096 > "$ASA_WORK/serve.out" 2> engine.err &
+          # Never let a run silently fall back to the coordinator reading every expert itself.
+          for _ in $(seq 1 120); do grep -q "\[CLUSTER\]" engine.err && break; grep -q "loaded in" engine.err && sleep 5 && break; sleep 5; done
+          grep "\[CLUSTER\]" engine.err | tee -a "$GITHUB_STEP_SUMMARY"
+          grep -q "coordinator connected to" engine.err || { echo "::error::engine did not connect to the expert workers"; tail -n 20 engine.err; exit 1; }
       - name: Public API gateway (only if the ASA_API_KEY secret exists)
         if: env.ASA_API_KEY != ''
         run: |

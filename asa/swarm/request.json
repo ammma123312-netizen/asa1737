@@ -1,8 +1,8 @@
 {
  "prompt": "ما هي عاصمة المملكة العربية السعودية؟",
  "ngen": 8,
- "workers": 2,
+ "workers": 4,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A3: smoke test after artifact-redirect fix"
+ "stage": "A4: 4 workers, delegation verified ([CLUSTER] line), shares fully pre-staged"
 }
