@@ -14,6 +14,11 @@ disk / page-cache speed, with no FUSE in the hot path.
         --include . --exclude '^layers\\.\\d+\\.ffn\\.experts\\.|engram' \\
         --link-from /srv/hffs-mount --link '*-0004[78]-of-*'
 
+Experts in RAM: with ``--ram-dir /dev/shm/asa --ram-budget-gb X`` shards are staged into the
+tmpfs while the running total of their *selected* bytes (header + owned tensors; holes in a
+tmpfs cost nothing) stays within the budget; the rest go to disk. ``out_dir`` always holds every
+file, with RAM shards as symlinks into ``ram_dir``, so the engine sees one directory.
+
 Holes read as zeros, so a staged view is only valid for a node that never reads
 outside its selection; `verify_selection` in the tests checks that on a fixture.
 """
@@ -75,10 +80,20 @@ def plan_ranges(header: dict, base: int, select) -> list[tuple[int, int]]:
     return out
 
 
+def _in_dir(path: str, root: str) -> bool:
+    root = os.path.realpath(root)
+    return os.path.realpath(path).startswith(root + os.sep)
+
+
 def stage(repo, out_dir: str, select, link_from: str | None = None, link_globs=(),
-          threads: int = 16, small_file_mb: float = 64, log=print) -> dict:
+          threads: int = 16, small_file_mb: float = 64, log=print,
+          ram_dir: str | None = None, ram_budget_gb: float = 0) -> dict:
     os.makedirs(out_dir, exist_ok=True)
     t0, fetched, jobs = time.time(), 0, []
+    budget = int(ram_budget_gb * 1e9) if ram_dir else 0
+    if ram_dir:
+        os.makedirs(ram_dir, exist_ok=True)
+    place = {"ram": [0, 0], "disk": [0, 0]}  # selected bytes, shards
     shards = sorted(p for p in repo.files if p.endswith(".safetensors"))
     for path in sorted(repo.files):
         dst = os.path.join(out_dir, path)
@@ -92,16 +107,33 @@ def stage(repo, out_dir: str, select, link_from: str | None = None, link_globs=(
         if repo.files[path] <= small_file_mb * 1e6 and not os.path.exists(dst):
             with open(dst, "wb") as f:
                 f.write(repo.read_range(path, 0, repo.files[path]))
-    for path in shards:
+    for path in shards:  # sorted: the RAM budget covers the lowest-numbered shards first
         dst = os.path.join(out_dir, path)
-        if os.path.lexists(dst):
-            if os.path.islink(dst):
-                continue
+        was_ram = bool(ram_dir) and os.path.islink(dst) and _in_dir(dst, ram_dir)
+        if os.path.islink(dst) and not was_ram:
+            continue                               # linked from a mount (--link)
         raw, header = header_of(repo, path)
-        fd = os.open(dst, os.O_RDWR | os.O_CREAT, 0o644)
-        os.ftruncate(fd, repo.files[path])        # sparse: holes cost no disk
+        ranges = plan_ranges(header, len(raw), select)
+        selected = len(raw) + sum(hi - lo for lo, hi in ranges)
+        in_ram = budget > 0 and place["ram"][0] + selected <= budget
+        if in_ram:
+            target = os.path.join(ram_dir, path)
+            os.makedirs(os.path.dirname(target) or ram_dir, exist_ok=True)
+            if os.path.lexists(dst) and not was_ram:
+                os.remove(dst)                     # previously staged on disk
+            if not os.path.lexists(dst):
+                os.symlink(os.path.abspath(target), dst)
+        else:
+            target = dst
+            if was_ram:                            # budget shrank: move back to disk
+                os.remove(dst)
+        kind = "ram" if in_ram else "disk"
+        place[kind][0] += selected
+        place[kind][1] += 1
+        fd = os.open(target, os.O_RDWR | os.O_CREAT, 0o644)
+        os.ftruncate(fd, repo.files[path])        # sparse: holes cost no disk or RAM
         os.pwrite(fd, raw, 0)
-        for lo, hi in plan_ranges(header, len(raw), select):
+        for lo, hi in ranges:
             jobs.append((fd, path, lo, hi))
 
     def one(job):
@@ -117,7 +149,11 @@ def stage(repo, out_dir: str, select, link_from: str | None = None, link_globs=(
         os.close(fd)
     dt = time.time() - t0
     stats = {"bytes": fetched, "seconds": round(dt, 1), "mb_s": round(fetched / max(dt, 1e-9) / 1e6),
-             "requests": len(jobs)}
+             "requests": len(jobs), "ram_bytes": place["ram"][0], "ram_shards": place["ram"][1],
+             "disk_bytes": place["disk"][0], "disk_shards": place["disk"][1]}
+    if ram_dir:
+        log(f"[stage] ram: {place['ram'][0]/1e9:.2f} GB in {place['ram'][1]} shards, "
+            f"disk: {place['disk'][0]/1e9:.2f} GB in {place['disk'][1]} shards")
     log(f"[stage] {fetched/1e9:.2f} GB in {dt:.0f}s ({stats['mb_s']} MB/s, {len(jobs)} requests) -> {out_dir}")
     return stats
 
@@ -133,7 +169,12 @@ def main(argv=None) -> int:
     ap.add_argument("--link-from", default=None, help="directory (e.g. an HFFS mount) to symlink --link files from")
     ap.add_argument("--link", action="append", default=[], metavar="GLOB")
     ap.add_argument("--threads", type=int, default=16)
+    ap.add_argument("--ram-dir", default=None, help="tmpfs directory for shards kept in RAM (e.g. /dev/shm/asa)")
+    ap.add_argument("--ram-budget-gb", type=float, default=0,
+                    help="max selected GB placed in --ram-dir; the rest goes to out_dir")
     a = ap.parse_args(argv)
+    if a.ram_budget_gb and not a.ram_dir:
+        ap.error("--ram-budget-gb needs --ram-dir")
     if not (a.owner or a.include):
         ap.error("give --owner K/N and/or --include REGEX")
     sels = []
@@ -142,7 +183,8 @@ def main(argv=None) -> int:
     if a.include:
         sels.append(regex_selector(a.include, a.exclude))
     repo = LocalRepo(a.repo) if a.local else HubRepo(a.repo, workers=a.threads)
-    stage(repo, a.out_dir, lambda name: any(f(name) for f in sels), a.link_from, a.link, a.threads)
+    stage(repo, a.out_dir, lambda name: any(f(name) for f in sels), a.link_from, a.link, a.threads,
+          ram_dir=a.ram_dir, ram_budget_gb=a.ram_budget_gb)
     return 0
 
 
