@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 import zipfile
 
@@ -25,15 +26,32 @@ ADDR_PREFIX = "swarm-addr-"
 DONE = "swarm-done"
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):  # surface 3xx instead of following it
+        return None
+
+
+_no_redirect = urllib.request.build_opener(_NoRedirect)
+
+
 def _api(path: str, raw: bool = False):
+    """GitHub REST call. Artifact downloads answer 302 to a pre-signed blob URL; that
+    URL must be fetched WITHOUT our Authorization header (the blob store rejects it
+    with 401), so redirects are followed by hand."""
     base = os.environ.get("GITHUB_API_URL", "https://api.github.com")
     req = urllib.request.Request(base + path, headers={
         "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     })
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return r.read() if raw else json.load(r)
+    try:
+        with _no_redirect.open(req, timeout=60) as r:
+            return r.read() if raw else json.load(r)
+    except urllib.error.HTTPError as e:
+        if e.code not in (301, 302, 303, 307, 308) or not e.headers.get("Location"):
+            raise
+        with urllib.request.urlopen(e.headers["Location"], timeout=120) as r:
+            return r.read() if raw else json.load(r)
 
 
 def list_artifacts() -> list[dict]:

@@ -4,5 +4,5 @@
  "workers": 2,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A2: smoke test after fixing ASA_WORK + capped pre-staging"
+ "stage": "A3: smoke test after artifact-redirect fix"
 }

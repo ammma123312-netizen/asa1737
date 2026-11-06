@@ -165,3 +165,39 @@ def test_cap_ranges_keeps_prestaging_inside_budget():
     rs = [("a", 0, 4_000_000_000), ("a", 4_000_000_000, 8_000_000_000), ("b", 0, 4_000_000_000)]
     assert cap_ranges(rs, 9) == rs[:2]
     assert cap_ranges(rs, 100) == rs
+
+
+def test_artifact_download_drops_auth_on_blob_redirect(monkeypatch):
+    """GitHub answers artifact downloads with 302 to a blob URL that rejects our token."""
+    import http.server
+    import io
+    import threading
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("addr.txt", "bore.pub:4242\n")
+    blob = buf.getvalue()
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path.startswith("/repos/"):
+                self.send_response(302)
+                self.send_header("Location", f"http://127.0.0.1:{srv.server_port}/blob")
+                self.end_headers()
+            elif self.headers.get("Authorization"):
+                self.send_response(401); self.end_headers()
+            else:
+                self.send_response(200); self.send_header("Content-Length", str(len(blob)))
+                self.end_headers(); self.wfile.write(blob)
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setenv("GITHUB_API_URL", f"http://127.0.0.1:{srv.server_port}")
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "o/r")
+    from asa.swarm.rendezvous import read_artifact_text
+    assert read_artifact_text({"id": 1}) == "bore.pub:4242"
+    srv.shutdown()
