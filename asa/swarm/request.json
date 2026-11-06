@@ -4,5 +4,5 @@
  "workers": 2,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A: smoke test (authenticated relay, rendezvous, cluster, HFFS on free runners)"
+ "stage": "A2: smoke test after fixing ASA_WORK + capped pre-staging"
 }

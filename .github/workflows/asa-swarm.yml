@@ -114,10 +114,12 @@ jobs:
         run: |
           k=$(( ${{ matrix.i }} - 1 )); n=${{ needs.plan.outputs.workers }}
           free=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
-          export HFFS_ARGS="--warm-owner $k/$n"
-          CACHE_GB=$(( free > 40 ? free - 10 : 30 )) ./asa/swarm/node_setup.sh
-          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; if grep -q Traceback "$ASA_WORK/hffs.log"; then cat "$ASA_WORK/hffs.log"; exit 1; fi; done
-          grep warm "$ASA_WORK/hffs.log" | tee -a "$GITHUB_STEP_SUMMARY"
+          cache=$(( free > 40 ? free - 10 : 30 ))
+          export HFFS_ARGS="--warm-owner $k/$n --warm-max-gb $(( cache * 8 / 10 ))"
+          CACHE_GB=$cache ./asa/swarm/node_setup.sh
+          L="$HOME/asa-swarm/hffs.log"   # $ASA_WORK only exists from the next step on
+          until grep -q "warm done" "$L"; do sleep 10; if grep -q Traceback "$L"; then cat "$L"; exit 1; fi; done
+          grep warm "$L" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Start expert worker behind the authenticated guard
         run: |
           CLUSTER_WORKER_CACHE=8 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
@@ -149,16 +151,15 @@ jobs:
       - run: pip install -q "PyJWT[crypto]"
       - uses: actions/download-artifact@v4
         with: {name: swarm-request}
-      - name: Free disk
-        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
       - name: Preflight (services)
         run: python -m asa.swarm.preflight
       - name: Node setup (dense tensors + draft head pre-staged)
         run: |
           export HFFS_ARGS="--warm-include . --warm-exclude ^layers\.[0-9]+\.ffn\.experts\.|engram"
           CACHE_GB=30 ./asa/swarm/node_setup.sh
-          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; if grep -q Traceback "$ASA_WORK/hffs.log"; then cat "$ASA_WORK/hffs.log"; exit 1; fi; done
-          grep warm "$ASA_WORK/hffs.log" | tee -a "$GITHUB_STEP_SUMMARY"
+          L="$HOME/asa-swarm/hffs.log"   # $ASA_WORK only exists from the next step on
+          until grep -q "warm done" "$L"; do sleep 10; if grep -q Traceback "$L"; then cat "$L"; exit 1; fi; done
+          grep warm "$L" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Wait for workers, authenticated tunnels, probe
         env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: |

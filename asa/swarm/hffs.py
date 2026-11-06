@@ -338,6 +338,17 @@ def safetensors_ranges(repo: HubRepo, select, threads: int = 16) -> list[tuple[s
         return [r for rs in ex.map(one, paths) for r in rs]
 
 
+def cap_ranges(ranges, max_gb: float):
+    """Keep ranges in order until max_gb is reached, so pre-staging never evicts itself."""
+    out, total, limit = [], 0, max_gb * 1e9
+    for r in ranges:
+        if total + (r[2] - r[1]) > limit:
+            break
+        out.append(r)
+        total += r[2] - r[1]
+    return out
+
+
 def warm(repo: HubRepo, cache: BlockCache, block: int, ranges, threads: int = 32) -> int:
     """Fetch the blocks covering `ranges` into the cache, in parallel. Returns bytes."""
     blocks = sorted({(p, i) for p, lo, hi in ranges for i in range(lo // block, (hi - 1) // block + 1)})
@@ -384,6 +395,8 @@ def main(argv=None) -> int:
     ap.add_argument("--warm-include", default=None, metavar="REGEX",
                     help="prefetch safetensors tensors matching this at mount time")
     ap.add_argument("--warm-exclude", default=None, metavar="REGEX")
+    ap.add_argument("--warm-max-gb", type=float, default=0,
+                    help="stop pre-staging after this many GB (0 = no limit); keeps it inside the cache")
     ap.add_argument("--warm-owner", default=None, metavar="K/N",
                     help="prefetch the routed experts cluster worker K of N will own")
     ap.add_argument("--make-view", nargs=2, metavar=("MOUNT", "VIEW"))
@@ -427,6 +440,7 @@ def main(argv=None) -> int:
         def do_warm():
             t = time.time()
             rs = safetensors_ranges(repo, lambda name: any(f(name) for f in selectors), a.threads)
+            rs = cap_ranges(rs, a.warm_max_gb or 0.9 * a.cache_gb)
             want = sum(hi - lo for _, lo, hi in rs)
             print(f"[hffs] warming {len(rs)} tensors, {want/1e9:.2f} GB", flush=True)
             got = warm(repo, cache, int(a.block_mb * 2**20), rs, a.threads)

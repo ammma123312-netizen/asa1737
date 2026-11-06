@@ -158,3 +158,10 @@ def test_guard_and_connect_splice_only_after_auth(tmp_path):
     ok, refused, raw = asyncio.run(scenario())
     assert ok == b"COLIBRI:hello"
     assert b"COLIBRI" not in refused and b"COLIBRI" not in raw
+
+
+def test_cap_ranges_keeps_prestaging_inside_budget():
+    from asa.swarm.hffs import cap_ranges
+    rs = [("a", 0, 4_000_000_000), ("a", 4_000_000_000, 8_000_000_000), ("b", 0, 4_000_000_000)]
+    assert cap_ranges(rs, 9) == rs[:2]
+    assert cap_ranges(rs, 100) == rs
