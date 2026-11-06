@@ -8,15 +8,76 @@ app_port: 7000
 pinned: false
 ---
 
-# ASA
+# ASA — تشغيل نموذج 763 مليار معلمة مجاناً وبجودته الكاملة
 
-> **ASA** is this repository's new name. It builds on the Odysseus self-hosted AI
-> workspace and adds tooling for running very large open models (700B+) on
-> limited hardware and GitHub Actions. See **[docs/asa/README.md](docs/asa/README.md)**
-> (Arabic) for the research, the project catalog and the feasibility planner; the progress
-> report is **[docs/asa/REPORT.md](docs/asa/REPORT.md)**
-> (`python -m asa.planner`). Internal names (`odysseus` CLI, `ODYSSEUS_*` env vars)
-> are kept so existing setups keep working.
+<div dir="rtl">
+
+**ASA** مشروع مفتوح المصدر يشغّل نموذج اللغة العملاق **DeepSeek-V4.1-Flash** (763 مليار معلمة، ترخيص MIT)
+**بأوزانه الأصلية دون أي خسارة في الجودة**، **وبتكلفة صفر**، بلا اشتراكات ولا مفاتيح API مدفوعة. يوزّع النموذج على
+**سرب من مشغّلات GitHub Actions المجانية**، على طريقة Petals، لكنه مبني بالكامل داخل هذا المشروع.
+
+📄 **التقرير الكامل:** [docs/asa/REPORT.md](docs/asa/REPORT.md) · 🔬 **البحث والتفاصيل:** [docs/asa/README.md](docs/asa/README.md) ·
+🖥️ **ضمّ حاسوبك إلى السرب:** [docs/asa/SELF_HOSTED.md](docs/asa/SELF_HOSTED.md)
+
+## النتائج المقيسة
+السؤال: «ما هي عاصمة المملكة العربية السعودية؟»
+
+| التجربة | الإعداد | الزمن (8 رموز) | الجواب |
+|---|---|---|---|
+| حاوية واحدة | ذاكرة 15 GB، والنموذج (510 GB) يُقرأ من الشبكة دون تنزيله | ≈55 دقيقة | «عاصمة المملكة العربية» (قُطع عند حد الرموز) |
+| A3 | سرب من عاملين (التوزيع لم يكن يعمل بعد) | 2,053 ث | ✅ «عاصمة المملكة العربية السعودية» |
+| A5 | 4 عمال، توزيع حقيقي، اتصال موثّق | 944 ث | ✅ |
+| **A6** | 4 عمال، والخبراء على أقراصهم المحلية | **669 ث** | ✅ |
+
+في A5 وA6 قرأ المنسّق 1.47 GB فقط من الخبراء بنفسه، مقابل 104 GB في A3، فالعمل وُزّع فعلاً.
+
+## كيف يعمل
+```
+            ┌───────────────── GitHub Actions (مجاناً) ─────────────────┐
+  سؤالك ──► │  المنسّق: الانتباه والتوجيه وجدول engram ورأس المسودة       │
+            │     │  TLS + توكن OIDC من GitHub (لا منفذ مكشوف بلا مصادقة)  │
+            │     ├──► عامل 1: حصته من الخبراء   (expert + layer) % n == 0 │
+            │     ├──► عامل 2 …                                            │
+            │     └──► عامل 19                                             │
+            └──────────────────────────────────────────────────────────────┘
+                 الأوزان تُقرأ من Hugging Face مباشرة، بلا حساب وبلا مفتاح
+```
+
+| المكوّن | الملف | الوظيفة |
+|---|---|---|
+| حاسبة الجدوى | `asa/planner.py` | هل يتسع النموذج لجهاز ما، وكم ستكون سرعته |
+| HFFS | `asa/swarm/hffs.py` | يُظهر مستودع Hugging Face قرصاً محلياً دون تنزيله |
+| التخزين المحلي | `asa/swarm/stage.py` | كل جهاز يحتفظ بحصته فقط، في الذاكرة أو على القرص |
+| الاتصال الآمن | `asa/swarm/relay.py` | TLS مع مصادقة OIDC، وقياس زمن كل طبقة |
+| تحسين Colibrì | `asa/swarm/patch_colibri.py` | `TCP_NODELAY`: الرحلة الواحدة من 43 ms إلى 1.9 ms |
+| السرب | `.github/workflows/asa-swarm.yml` | منسّق وحتى 19 عاملاً |
+| الموجّه | `asa/router/` | نقطة اتصال واحدة متوافقة مع OpenAI، مع توجيه تلقائي |
+| من التطبيق | `asa/swarm/bridge.py` | نموذج `asa-swarm`: تسأل عبر GitHub Issue ويصلك الجواب لاحقاً |
+| المشاريع | `asa/projects.yaml` | 138 مشروعاً مفتوح المصدر مصنّفة حسب تأثيرها على الجودة |
+
+## التشغيل
+- **على GitHub:** عدّل `asa/swarm/request.json` (السؤال، وعدد العمال، وعدد الرموز) وارفعه، أو افتح Issue عليها الوسم `asa-ask`.
+- **على جهازك:** `./asa/swarm/node_setup.sh`، ثم `coli run --model ~/asa-swarm/view "سؤالك"`.
+- **حساب الجدوى:** `python -m asa.planner --swarm 19` أو `python -m asa.planner --list`.
+
+## حدود صريحة
+- **السرعة:** أفضل نتيجة حتى الآن 669 ثانية لـ 8 رموز. العمل جارٍ على وضع الخبراء في الذاكرة والاتصال المباشر بين المشغّلات.
+- **شروط GitHub:** السرب تجربة تُشغَّل يدوياً لاختبار المشروع، وليس خدمة دائمة.
+- **الخصوصية:** سؤالك المرسَل عبر Issue يظهر علناً في المستودع.
+
+</div>
+
+**English summary:** ASA runs DeepSeek-V4.1-Flash (763B, MIT) at native precision with zero cost by spreading
+its experts over free GitHub Actions runners (Colibri cluster mode, OIDC-authenticated links, weights streamed from
+Hugging Face). Best measured run so far: 669 s for 8 tokens with 4 workers, correct answer. Full report:
+[docs/asa/REPORT.md](docs/asa/REPORT.md).
+
+---
+
+## التطبيق المرفق (Odysseus)
+يتضمّن المستودع أيضاً تطبيق **Odysseus**، وهو واجهة محادثة تعمل على جهازك. ASA مبني فوقه، فيعمل الموجّه داخل حاويته،
+ويُسجَّل نموذج `asa-swarm` فيه. الأسماء الداخلية (أمر `odysseus` ومتغيرات `ODYSSEUS_*`) بقيت كما هي حتى تظل الإعدادات
+الحالية تعمل.
 
 ```
 ───────────────────────────────────────────────
