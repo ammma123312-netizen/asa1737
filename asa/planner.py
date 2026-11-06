@@ -42,6 +42,7 @@ class Hardware:
     disk_bw_gbs: float      # sustained random-ish read bandwidth (GB/s)
     cost: str
     notes: str = ""
+    vram_gb: float = 0.0    # GPU memory used as extra fast tier (hot weights)
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,10 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
              4, 15, 30, 15, 0.3, "n/a",
              "Measured 2026-11: Qwen3-Coder-30B-A3B via Colibrì decodes ~2.0 tok/s "
              "here (4 vCPU, 15 GB RAM), engine RSS 3.4 GB."),
+    Hardware("consultant-8gbvram", "Consultant's box: 8 GB VRAM GPU, 16 GB RAM, PCIe4 NVMe",
+             8, 16, 2000, 50, 6.0, "owned",
+             "The constraint set from the technical advisor's plan (NVMe 5-7 GB/s).",
+             vram_gb=8),
     Hardware("hf-space-cpu-basic", "Hugging Face Space cpu-basic",
              2, 16, 50, 10, 0.3, "free", "Ephemeral disk; sleeps when idle."),
     Hardware("desktop-nvme-32gb", "Desktop, 32 GB RAM, PCIe4 NVMe",
@@ -98,8 +103,13 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
 MODELS: dict[str, Model] = {m.id: m for m in (
     Model("glm-5.2", "GLM-5.2 (744B MoE, int4)", 744, 40, 429.3, 16, "colibri",
           "Colibrì int4-g64 + int8 MTP head."),
-    Model("deepseek-r1-1.58bit", "DeepSeek-R1 671B, Unsloth dynamic 1.58-bit", 671, 37, 131, 20,
+    Model("deepseek-r1-1.58bit", "DeepSeek-R1 671B, Unsloth dynamic 1.58-bit", 671, 37, 131, 8,
           "llama.cpp", "Unsloth UD-IQ1_S GGUF; llama.cpp mmaps what does not fit."),
+    Model("dense-700b-fp16", "Hypothetical dense 700B, FP16", 700, 700, 1400, 8, "deepspeed",
+          "The advisor's starting point: 1.4 TB, every token reads all of it."),
+    Model("dense-700b-fp8", "Hypothetical dense 700B, FP8", 700, 700, 700, 8, "deepspeed"),
+    Model("dense-700b-iq2", "Hypothetical dense 700B, ~2-bit (IQ2_XS)", 700, 700, 180, 8, "llama.cpp",
+          "mmap'd GGUF; still a full 180 GB read per forward pass."),
     Model("llama-3.1-405b-q4", "Llama 3.1 405B dense, Q4_K_M", 405, 405, 243, 8, "airllm",
           "Dense: every token touches every weight. Layer streaming only."),
     Model("llama-3.1-70b-q4", "Llama 3.1 70B dense, Q4_K_M", 70, 70, 42.5, 8, "airllm"),
@@ -145,7 +155,25 @@ def _cache_hit(cache_gb: float, expert_gb: float) -> float:
     return min(0.98, share ** 0.25)
 
 
-def plan(hw: Hardware, m: Model, disk_gb: float | None = None) -> Plan:
+def spec_pass_cost(m: Model, rows: int) -> float:
+    """Cost of one verify pass over `rows` draft tokens, in single-token steps.
+
+    Dense: the weights are read once per pass however many rows are verified,
+    so on a bandwidth-bound machine the pass costs ~1 step.
+    MoE: each extra row routes to its own experts, so a pass reads the *union*
+    of experts. Colibrì measured a 2-row verify at ~1.5 steps and a 3-row one
+    at ~2 (docs/qwen36.md), i.e. +0.5 step per extra row."""
+    if rows <= 1:
+        return 1.0
+    return 1.0 if not m.is_moe else 1.0 + 0.5 * (rows - 1)
+
+
+def plan(hw: Hardware, m: Model, disk_gb: float | None = None,
+         spec_rows: int = 1, spec_accept: float = 1.0) -> Plan:
+    """spec_rows: draft tokens verified per pass (1 = no speculative decoding).
+    spec_accept: mean tokens produced per pass (accepted drafts + 1 bonus)."""
+    if not 1.0 <= spec_accept <= spec_rows + 1:
+        raise ValueError("spec_accept must be between 1 and spec_rows + 1")
     disk = hw.disk_gb if disk_gb is None else disk_gb
     reasons: list[str] = []
     fits_disk = m.weights_gb <= disk
@@ -157,7 +185,7 @@ def plan(hw: Hardware, m: Model, disk_gb: float | None = None) -> Plan:
 
     bpp = m.bytes_per_param
     active_gb = m.active_b * bpp
-    usable_ram = max(0.0, hw.ram_gb - RAM_OVERHEAD_GB)
+    usable_ram = max(0.0, hw.ram_gb - RAM_OVERHEAD_GB) + hw.vram_gb
 
     if m.weights_gb <= usable_ram:
         mode, resident = "in-ram", 1.0
@@ -177,10 +205,14 @@ def plan(hw: Hardware, m: Model, disk_gb: float | None = None) -> Plan:
 
     ram_bytes = active_gb * resident
     disk_bytes = active_gb * (1 - resident)
-    sec_per_tok = ram_bytes / hw.mem_bw_gbs + disk_bytes / hw.disk_bw_gbs
+    sec_per_pass = (ram_bytes / hw.mem_bw_gbs + disk_bytes / hw.disk_bw_gbs) * spec_pass_cost(m, spec_rows)
+    sec_per_tok = sec_per_pass / spec_accept
     tps = 1.0 / sec_per_tok if sec_per_tok > 0 else float("inf")
 
     engine = m.engine
+    if spec_rows > 1:
+        reasons.append(f"speculative decoding: {spec_rows} rows/pass, {spec_accept} tokens/pass, "
+                       f"pass cost {spec_pass_cost(m, spec_rows):.1f} steps")
     if mode == "in-ram" and m.engine == "airllm":
         engine = "llama.cpp"  # no need to stream if it fits
 
@@ -221,6 +253,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--all-models", action="store_true")
     ap.add_argument("--disk-gb", type=float, default=None,
                     help="override usable disk (e.g. after freeing space on a runner)")
+    ap.add_argument("--spec-rows", type=int, default=1,
+                    help="draft tokens verified per pass (speculative decoding); 1 = off")
+    ap.add_argument("--spec-accept", type=float, default=1.0,
+                    help="mean tokens produced per verify pass (accepted drafts + 1)")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--list", action="store_true", help="list hardware and model presets")
     a = ap.parse_args(argv)
@@ -233,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     models = list(MODELS.values()) if a.all_models or not a.model else [MODELS[a.model]]
-    plans = [plan(HARDWARE[a.hardware], m, a.disk_gb) for m in models]
+    plans = [plan(HARDWARE[a.hardware], m, a.disk_gb, a.spec_rows, a.spec_accept) for m in models]
     if a.json:
         print(json.dumps([p.to_dict() for p in plans], indent=2))
     else:

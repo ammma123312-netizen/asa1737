@@ -77,3 +77,40 @@ def test_catalog_has_at_least_20_unique_projects():
         assert p["category"] in categories, p["name"]
         assert p["repo"].count("/") == 1, p["repo"]
         assert p["solves"], p["name"]
+
+
+# --- advisor's plan: 700B on 8 GB VRAM + 16 GB RAM + PCIe4 NVMe ------------
+
+ADVISOR = HARDWARE["consultant-8gbvram"]
+
+
+def test_dense_700b_is_unusable_at_every_precision_on_advisor_box():
+    for mid in ("dense-700b-fp16", "dense-700b-fp8", "dense-700b-iq2"):
+        p = plan(ADVISOR, MODELS[mid])
+        assert p.mode == "layer-streaming", mid
+        assert p.est_tokens_per_s < 0.1, (mid, p.est_tokens_per_s)
+
+
+def test_speculative_decoding_multiplies_dense_speed_by_tokens_per_pass():
+    base = plan(ADVISOR, MODELS["dense-700b-iq2"])
+    spec = plan(ADVISOR, MODELS["dense-700b-iq2"], spec_rows=4, spec_accept=2.5)
+    assert abs(spec.est_tokens_per_s / base.est_tokens_per_s - 2.5) < 0.1
+
+
+def test_speculative_decoding_barely_helps_streamed_moe():
+    # A verify pass over several rows reads the union of their experts.
+    base = plan(ADVISOR, MODELS["glm-5.2"])
+    spec = plan(ADVISOR, MODELS["glm-5.2"], spec_rows=4, spec_accept=2.5)
+    assert spec.est_tokens_per_s / base.est_tokens_per_s < 1.2
+
+
+def test_moe_beats_dense_700b_by_an_order_of_magnitude_on_advisor_box():
+    moe = plan(ADVISOR, MODELS["deepseek-r1-1.58bit"])
+    dense = plan(ADVISOR, MODELS["dense-700b-iq2"], spec_rows=7, spec_accept=4)
+    assert moe.est_tokens_per_s > 10 * dense.est_tokens_per_s
+
+
+def test_invalid_spec_settings_are_rejected():
+    import pytest
+    with pytest.raises(ValueError):
+        plan(ADVISOR, MODELS["glm-5.2"], spec_rows=2, spec_accept=5)
