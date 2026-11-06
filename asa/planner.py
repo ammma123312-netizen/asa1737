@@ -77,6 +77,10 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
     Hardware("gha-larger-64core", "GitHub Actions larger runner, 64 cores",
              64, 256, 2040, 120, 1.5, "paid (per minute)",
              "Team/Enterprise plans only. Big enough to hold GLM-5.2 on disk."),
+    Hardware("ccr-container", "Claude Code cloud container (measured)",
+             4, 15, 30, 15, 0.3, "n/a",
+             "Measured 2026-11: Qwen3-Coder-30B-A3B via Colibrì decodes ~2.0 tok/s "
+             "here (4 vCPU, 15 GB RAM), engine RSS 3.4 GB."),
     Hardware("hf-space-cpu-basic", "Hugging Face Space cpu-basic",
              2, 16, 50, 10, 0.3, "free", "Ephemeral disk; sleeps when idle."),
     Hardware("desktop-nvme-32gb", "Desktop, 32 GB RAM, PCIe4 NVMe",

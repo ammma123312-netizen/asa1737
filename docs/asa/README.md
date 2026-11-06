@@ -25,6 +25,26 @@
 النموذج لا يتسع. أما النماذج التي **تعمل فعلاً** على المشغّل المجاني فهي
 Qwen3-Coder-30B-A3B (19 GB) وQwen3.6-35B-A3B (23 GB) وOLMoE، وكلها من نوع MoE.
 
+### ✅ تجربة فعلية: بنيت Colibrì وشغّلته بنفسي
+
+جرّبته في حاوية مواصفاتها مطابقة تقريباً لمشغّل GitHub المجاني (4 أنوية، 15 GB RAM، 30 GB قرص)،
+باستخدام Colibrì v2.1.0 (commit `0a5504a`) ونموذج Qwen3-Coder-30B-A3B:
+
+| الخطوة | النتيجة |
+|---|---|
+| `./setup.sh` | 49 ثانية |
+| `make qwen36` | 39 ثانية |
+| تنزيل الأوزان (19.4 GB) | 73 ثانية |
+| `coli doctor` | جاهز (مع تحذير: بعض الخبراء يُقرؤون من القرص، والإقامة المتوقعة في الذاكرة 23%) |
+| `coli run --ngen 64` | جواب صحيح في 54 ثانية، تشمل تحميل النموذج |
+| `coli serve` + `/v1/chat/completions` | يعمل؛ واجهة متوافقة مع OpenAI |
+| سؤال بالعربية (30 رمزاً) | «العاصمة… هي الرياض» في 24 ثانية |
+| السرعة الثابتة | **≈2.0 رمز/ثانية** (بين 1.97 و2.16) |
+| ذاكرة المحرك | 3.4 GB فقط |
+
+تقدير `asa.planner` لهذا الجهاز كان 1.18 رمز/ثانية، أي ضمن ضعفين من القياس. الاختبار
+`test_estimate_matches_measured_run_in_4cpu_container` يثبّت هذه النتيجة.
+
 **وحتى لو نجح التشغيل، يبقى بطيئاً.** هذا ما توقّعته في سؤالك، والأرقام تؤكده:
 
 | الجهاز | سرعة GLM-5.2 المقيسة (حسب Colibrì) | تقدير `asa.planner` |
@@ -155,9 +175,10 @@ python -m asa.planner --hardware workstation-128gb --model glm-5.2 --json
 | المرحلة | المحتوى | الحالة |
 |---|---|---|
 | 1 | المخطط `asa/planner.py` + الكتالوج `asa/projects.yaml` + الاختبارات | ✅ تم |
-| 2 | ورش GitHub Actions: `asa-ci` و`asa-colibri` و`asa-airllm` | ✅ تم (لم تُشغَّل بعد على GitHub) |
+| 2 | ورش GitHub Actions: `asa-ci` و`asa-colibri` و`asa-airllm` | ✅ تم (أوامر asa-colibri جُرّبت محلياً) |
 | 3 | طبقة السرعة `asa/router/litellm.yaml` + هذا المستند | ✅ تم |
-| 4 | تشغيل `asa-colibri` بنموذج Qwen3-Coder-30B على المشغّل المجاني، وتسجيل السرعة الفعلية لمعايرة المخطط | ⏭ التالي |
+| 4 | بناء Colibrì وتشغيل Qwen3-Coder-30B فعلياً (4 أنوية / 15 GB)، وقياس السرعة، ومعايرة المخطط | ✅ تم (≈2 رمز/ثانية) |
+| 4ب | تشغيل الورشة `asa-colibri` نفسها على GitHub | ⏭ التالي |
 | 5 | مشغّل ذاتي (حاسوبك بقرص NVMe ≥ 500 GB) لتشغيل GLM-5.2 عبر Issues بالوسم `asa-ask` | ⏭ |
 | 6 | ربط LiteLLM في `docker/entrypoint.sh` خلف متغير `ASA_ROUTER=1` | ⏭ |
 | 7 | ذاكرة مؤقتة دلالية (GPTCache) وموجّه RouteLLM | ⏭ |
@@ -174,7 +195,7 @@ python -m asa.planner --hardware workstation-128gb --model glm-5.2 --json
 ```bash
 git clone https://github.com/JustVugg/colibri && cd colibri/c
 ./setup.sh && make qwen36
-./coli serve --model /nvme/qwen3-coder-30b       # http://127.0.0.1:8000/v1
+./coli serve --model /nvme/qwen3-coder-30b --model-id colibri   # http://127.0.0.1:8000/v1
 pip install 'litellm[proxy]'
 litellm --config asa/router/litellm.yaml --port 4000
 # في التطبيق: LLM_HOSTS=localhost:4000
@@ -184,7 +205,7 @@ litellm --config asa/router/litellm.yaml --port 4000
 
 - أرقام المخطط **تقديرات** تقارب الواقع ضمن ضعفين تقريباً، وليست قياسات.
 - ذاكرة `actions/cache` في GitHub محدودة بـ 10 GB للمستودع، فتُنزَّل الأوزان من جديد في كل تشغيل.
-- AirLLM مصمم أساساً لبطاقات GPU. دعمه لـ CPU موجود منذ الإصدار v2.10.1، لكنه بطيء جداً.
+- AirLLM لم يُجرَّب فعلياً بعد. وهو مصمم أساساً لبطاقات GPU. دعمه لـ CPU موجود منذ الإصدار v2.10.1، لكنه بطيء جداً.
 - الوسم `asa-ask` لا يضيفه إلا من لديه صلاحية triage أو أعلى، فلا يستطيع غريب تشغيل الورشة على حسابك.
 
 ## المصادر

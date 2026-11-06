@@ -31,6 +31,14 @@ def test_estimate_is_within_2x_of_colibri_published_numbers():
     assert 0.9 <= plan(HARDWARE["workstation-128gb"], MODELS["glm-5.2"]).est_tokens_per_s <= 3.7
 
 
+def test_estimate_matches_measured_run_in_4cpu_container():
+    # Measured with Colibrì 2.1.0 (commit 0a5504a) on 4 vCPU / 15 GB RAM:
+    # Qwen3-Coder-30B-A3B decoded 1.97-2.16 tok/s end-to-end.
+    p = plan(HARDWARE["ccr-container"], MODELS["qwen3-coder-30b-a3b"])
+    assert p.mode == "expert-streaming"
+    assert 1.0 <= p.est_tokens_per_s <= 4.0, p.est_tokens_per_s
+
+
 def test_smoke_model_fits_free_runner_after_disk_cleanup():
     p = plan(HARDWARE["gha-free-public"], MODELS["qwen3-coder-30b-a3b"], disk_gb=60)
     assert p.fits_disk and p.fits_ram_min

@@ -26,7 +26,7 @@ model_list:
 
   - model_name: asa-big
     litellm_params:
-      model: openai/colibri
+      model: openai/colibri   # start the engine with: coli serve --model DIR --model-id colibri
       api_base: http://127.0.0.1:8000/v1
       api_key: os.environ/COLI_API_KEY
       # A 744B model on streamed experts can take minutes per answer.
