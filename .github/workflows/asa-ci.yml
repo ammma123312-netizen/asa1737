@@ -1,0 +1,36 @@
+name: ASA planner
+
+on:
+  push:
+    paths: ["asa/**", "tests/test_asa_planner.py", ".github/workflows/asa-*.yml"]
+  pull_request:
+    paths: ["asa/**", "tests/test_asa_planner.py", ".github/workflows/asa-*.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pytest-asyncio pyyaml
+      - run: python -m pytest tests/test_asa_planner.py -q
+      - name: Feasibility table for this runner
+        run: |
+          {
+            echo '## What this free runner can run'
+            echo '```'
+            nproc; free -g | head -2; df -h / | tail -1
+            echo
+            python -m asa.planner --hardware gha-free-public --all-models
+            echo
+            echo '# same runner after freeing ~60 GB of preinstalled toolchains'
+            python -m asa.planner --hardware gha-free-public --disk-gb 70 --all-models
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
