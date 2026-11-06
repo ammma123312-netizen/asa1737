@@ -116,3 +116,28 @@ def test_invalid_spec_settings_are_rejected():
     import pytest
     with pytest.raises(ValueError):
         plan(ADVISOR, MODELS["glm-5.2"], spec_rows=2, spec_accept=5)
+
+
+# --- lossless speed: what "original speed without quality loss" costs ------
+
+def test_native_precision_700b_class_needs_hundreds_of_gb_fast_memory():
+    from asa.planner import requirements
+    for mid in ("deepseek-v3-fp8-native", "kimi-k2-int4-native"):
+        r = requirements(MODELS[mid], target_tps=10)
+        assert r.fast_memory_gb > 500, mid
+        assert r.bandwidth_gbs > 150, mid
+
+
+def test_hosted_api_speed_needs_gpu_class_bandwidth_for_lossless_fp8():
+    from asa.planner import requirements
+    r = requirements(MODELS["deepseek-v3-fp8-native"], target_tps=30)
+    assert r.bandwidth_gbs > 1000
+    assert "GPU" in r.example
+
+
+def test_every_catalog_project_declares_quality_impact():
+    data = yaml.safe_load(CATALOG.read_text(encoding="utf-8"))
+    for p in data["projects"]:
+        assert p.get("quality") in ("lossless", "lossy", "depends"), p["name"]
+    lossless = {p["name"] for p in data["projects"] if p["quality"] == "lossless"}
+    assert {"vLLM", "EAGLE (speculative decoding)", "LMCache"} <= lossless

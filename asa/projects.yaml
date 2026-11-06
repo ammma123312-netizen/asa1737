@@ -2,6 +2,11 @@
 # limited hardware, and for hiding the latency that comes with it.
 # Arabic explanations live in docs/asa/README.md.
 #
+# quality: lossless = output identical to the original model (or bit-exact under greedy)
+#          lossy    = trades accuracy for speed/size (quantization, sparsity
+#                     prediction, weaker-model routing, fuzzy cache hits)
+#          depends  = engine is exact; quality is set by the weights you load
+#
 # solves: memory  = run a model bigger than RAM/VRAM
 #         speed   = more tokens per second
 #         latency = faster first answer / fewer slow calls
@@ -19,6 +24,7 @@ projects:
   # --- streaming / offload -------------------------------------------------
   - name: Colibrì
     repo: JustVugg/colibri
+    quality: depends
     category: streaming
     solves: [memory, scale]
     openai_api: true
@@ -26,6 +32,7 @@ projects:
     role: "Streams MoE experts from NVMe; GLM-5.2 (744B) on ~25 GB RAM. Has a cluster mode."
   - name: AirLLM
     repo: lyogavin/airllm
+    quality: lossless
     category: streaming
     solves: [memory]
     openai_api: false
@@ -33,6 +40,7 @@ projects:
     role: "Layer-by-layer loading of dense models; 70B on a 4 GB GPU, 405B on 8 GB VRAM. Very slow."
   - name: llama.cpp
     repo: ggml-org/llama.cpp
+    quality: depends
     category: streaming
     solves: [memory, speed]
     openai_api: true
@@ -40,6 +48,7 @@ projects:
     role: "Reference CPU/GPU engine. mmap lets the OS page in weights that do not fit in RAM."
   - name: ik_llama.cpp
     repo: ikawrakow/ik_llama.cpp
+    quality: depends
     category: streaming
     solves: [speed, memory]
     openai_api: true
@@ -47,6 +56,7 @@ projects:
     role: "llama.cpp fork with faster CPU kernels and MoE tensor-override tricks for huge models."
   - name: KTransformers
     repo: kvcache-ai/ktransformers
+    quality: depends
     category: streaming
     solves: [memory, speed]
     openai_api: true
@@ -54,6 +64,7 @@ projects:
     role: "CPU/GPU hybrid for giant MoEs: experts on CPU, attention on one GPU (DeepSeek 671B on 24 GB VRAM)."
   - name: PowerInfer
     repo: SJTU-IPADS/PowerInfer
+    quality: lossy
     category: streaming
     solves: [speed, memory]
     openai_api: false
@@ -61,6 +72,7 @@ projects:
     role: "Keeps 'hot' neurons on GPU and 'cold' on CPU by exploiting activation sparsity."
   - name: FlexLLMGen
     repo: FMInference/FlexLLMGen
+    quality: depends
     category: streaming
     solves: [memory]
     openai_api: false
@@ -68,6 +80,7 @@ projects:
     role: "Offloads weights/KV across GPU, CPU and disk; optimised for high-throughput batch jobs."
   - name: DeepSpeed (ZeRO-Inference)
     repo: deepspeedai/DeepSpeed
+    quality: lossless
     category: streaming
     solves: [memory, scale]
     openai_api: false
@@ -77,6 +90,7 @@ projects:
   # --- quantization --------------------------------------------------------
   - name: BitNet.cpp
     repo: microsoft/BitNet
+    quality: depends
     category: quantization
     solves: [memory, speed]
     openai_api: false
@@ -84,6 +98,7 @@ projects:
     role: "1.58-bit (ternary) inference on CPU; several times faster and far smaller than FP16."
   - name: Unsloth (dynamic GGUF quants)
     repo: unslothai/unsloth
+    quality: lossy
     category: quantization
     solves: [memory]
     openai_api: false
@@ -91,6 +106,7 @@ projects:
     role: "Dynamic 1.58-2.5 bit GGUFs that shrink DeepSeek-R1 671B from 720 GB to ~131 GB."
   - name: HQQ
     repo: mobiusml/hqq
+    quality: lossy
     category: quantization
     solves: [memory]
     openai_api: false
@@ -98,6 +114,7 @@ projects:
     role: "Calibration-free fast quantization (1-8 bit); quantize a 70B in minutes."
   - name: GPTQModel
     repo: ModelCloud/GPTQModel
+    quality: lossy
     category: quantization
     solves: [memory, speed]
     openai_api: false
@@ -105,6 +122,7 @@ projects:
     role: "GPTQ/AWQ-style 4-bit quantization toolkit with CPU and GPU kernels."
   - name: LLM Compressor
     repo: vllm-project/llm-compressor
+    quality: lossy
     category: quantization
     solves: [memory, speed]
     openai_api: false
@@ -114,6 +132,7 @@ projects:
   # --- fast serving --------------------------------------------------------
   - name: vLLM
     repo: vllm-project/vllm
+    quality: lossless
     category: serving
     solves: [speed, scale]
     openai_api: true
@@ -121,6 +140,7 @@ projects:
     role: "PagedAttention + continuous batching; the throughput standard on GPUs."
   - name: SGLang
     repo: sgl-project/sglang
+    quality: lossless
     category: serving
     solves: [speed, latency]
     openai_api: true
@@ -128,6 +148,7 @@ projects:
     role: "RadixAttention prefix reuse; very fast for agents and repeated prompts."
   - name: ExLlamaV3
     repo: turboderp-org/exllamav3
+    quality: lossy
     category: serving
     solves: [speed, memory]
     openai_api: false
@@ -135,6 +156,7 @@ projects:
     role: "Fastest single-user GPU decoding with EXL3 quantization at fractional bitrates."
   - name: mistral.rs
     repo: EricLBuehler/mistral.rs
+    quality: depends
     category: serving
     solves: [speed]
     openai_api: true
@@ -142,6 +164,7 @@ projects:
     role: "Rust engine with ISQ (in-situ quantization), paged attention and speculative decoding."
   - name: MLC LLM
     repo: mlc-ai/mlc-llm
+    quality: depends
     category: serving
     solves: [speed]
     openai_api: true
@@ -151,6 +174,7 @@ projects:
   # --- distributed ---------------------------------------------------------
   - name: Petals
     repo: bigscience-workshop/petals
+    quality: lossless
     category: distributed
     solves: [scale, memory]
     openai_api: false
@@ -158,6 +182,7 @@ projects:
     role: "BitTorrent-style: each volunteer serves a few layers of a huge model."
   - name: exo
     repo: exo-explore/exo
+    quality: lossless
     category: distributed
     solves: [scale, memory]
     openai_api: true
@@ -165,6 +190,7 @@ projects:
     role: "Pools phones, laptops and Macs on a LAN into one inference cluster."
   - name: distributed-llama
     repo: b4rtaz/distributed-llama
+    quality: depends
     category: distributed
     solves: [scale, speed]
     openai_api: true
@@ -174,6 +200,7 @@ projects:
   # --- latency hiding ------------------------------------------------------
   - name: EAGLE (speculative decoding)
     repo: SafeAILab/EAGLE
+    quality: lossless
     category: latency
     solves: [speed]
     openai_api: false
@@ -181,6 +208,7 @@ projects:
     role: "Draft head guesses several tokens, the big model verifies them in one pass (2-3x)."
   - name: LMCache
     repo: LMCache/LMCache
+    quality: lossless
     category: latency
     solves: [latency]
     openai_api: false
@@ -188,6 +216,7 @@ projects:
     role: "Stores and reuses KV cache across requests so repeated context is not recomputed."
   - name: GPTCache
     repo: zilliztech/GPTCache
+    quality: lossy
     category: latency
     solves: [latency]
     openai_api: false
@@ -195,6 +224,7 @@ projects:
     role: "Semantic cache: a similar question gets the stored answer instantly."
   - name: LiteLLM
     repo: BerriAI/litellm
+    quality: depends
     category: latency
     solves: [latency, scale]
     openai_api: true
@@ -202,6 +232,7 @@ projects:
     role: "One OpenAI endpoint in front of every backend, with fallbacks, timeouts and load balancing."
   - name: RouteLLM
     repo: lm-sys/RouteLLM
+    quality: lossy
     category: latency
     solves: [latency, speed]
     openai_api: true
@@ -211,6 +242,7 @@ projects:
   # --- platform ------------------------------------------------------------
   - name: Ollama
     repo: ollama/ollama
+    quality: depends
     category: platform
     solves: [speed]
     openai_api: true
@@ -218,6 +250,7 @@ projects:
     role: "One-command local model server; easiest way to run the fast small tier."
   - name: LocalAI
     repo: mudler/LocalAI
+    quality: depends
     category: platform
     solves: [scale]
     openai_api: true
@@ -225,6 +258,7 @@ projects:
     role: "Drop-in OpenAI-compatible server with many backends and P2P federation."
   - name: llamafile
     repo: Mozilla-Ocho/llamafile
+    quality: depends
     category: platform
     solves: [speed]
     openai_api: true

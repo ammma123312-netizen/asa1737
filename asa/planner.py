@@ -110,6 +110,13 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
 # Disk sizes for Colibrì models are taken from Colibrì's own setup catalog
 # (c/setup_catalog.py). Others are standard GGUF quant sizes.
 MODELS: dict[str, Model] = {m.id: m for m in (
+    # Released natively at this precision: running them as-is loses nothing.
+    Model("deepseek-v3-fp8-native", "DeepSeek-V3/R1 671B, native FP8 (original weights)",
+          671, 37, 690, 8, "ktransformers",
+          "DeepSeek trains and ships FP8; this is the full-quality model."),
+    Model("kimi-k2-int4-native", "Kimi K2 Thinking 1T, native INT4 (quantization-aware trained)",
+          1000, 32, 594, 8, "ktransformers",
+          "Moonshot ships INT4 trained with QAT; INT4 is its original precision."),
     Model("glm-5.2", "GLM-5.2 (744B MoE, int4)", 744, 40, 429.3, 16, "colibri",
           "Colibrì int4-g64 + int8 MTP head."),
     Model("deepseek-r1-1.58bit", "DeepSeek-R1 671B, Unsloth dynamic 1.58-bit", 671, 37, 131, 8,
@@ -245,6 +252,42 @@ def plan(hw: Hardware, m: Model, disk_gb: float | None = None,
     )
 
 
+@dataclass
+class Requirement:
+    model: str
+    target_tps: float
+    spec_accept: float
+    fast_memory_gb: float      # RAM+VRAM needed so no weight comes from disk
+    bandwidth_gbs: float       # memory bandwidth needed for the target speed
+    example: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def requirements(m: Model, target_tps: float, spec_accept: float = 1.0) -> Requirement:
+    """Inverse of plan(): hardware needed for `target_tps` with no precision loss.
+
+    Lossless means the weights stay at the precision you chose and nothing is
+    skipped, so every token reads the full active set. The only lossless lever
+    that cuts bytes per token is speculative decoding, and only for dense
+    models; for MoE we keep spec_accept as given but warn in docs that the
+    verify pass reads extra experts (see spec_pass_cost)."""
+    active_gb = m.active_b * m.bytes_per_param
+    passes_per_s = target_tps / spec_accept * spec_pass_cost(m, max(1, round(spec_accept)))
+    bw = active_gb * passes_per_s
+    mem = m.weights_gb + RAM_OVERHEAD_GB
+    if bw <= 60 and mem <= 128:
+        ex = "a single desktop/workstation"
+    elif bw <= 400 and mem <= 768:
+        ex = "one dual-socket EPYC/Xeon server with 12-channel DDR5 (~400-900 GB/s theoretical)"
+    elif bw <= 3000:
+        ex = "a GPU server: several 80-141 GB datacenter GPUs, rented by the hour"
+    else:
+        ex = "a multi-GPU node with NVLink (8x H100/H200 class)"
+    return Requirement(m.id, target_tps, spec_accept, round(mem), round(bw), ex)
+
+
 def _fmt(p: Plan) -> str:
     lines = [f"[{p.hardware}] {p.model}: {p.verdict}"]
     if p.mode != "impossible":
@@ -266,6 +309,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="draft tokens verified per pass (speculative decoding); 1 = off")
     ap.add_argument("--spec-accept", type=float, default=1.0,
                     help="mean tokens produced per verify pass (accepted drafts + 1)")
+    ap.add_argument("--target-tps", type=float, default=None,
+                    help="instead of a plan, print the hardware a model needs for this speed")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--list", action="store_true", help="list hardware and model presets")
     a = ap.parse_args(argv)
@@ -278,6 +323,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     models = list(MODELS.values()) if a.all_models or not a.model else [MODELS[a.model]]
+    if a.target_tps:
+        reqs = [requirements(m, a.target_tps, a.spec_accept) for m in models]
+        if a.json:
+            print(json.dumps([r.to_dict() for r in reqs], indent=2))
+        else:
+            for r in reqs:
+                print(f"{r.model:24} {r.target_tps:>5} tok/s needs {r.fast_memory_gb:>5} GB fast memory, "
+                      f"{r.bandwidth_gbs:>6} GB/s -> {r.example}")
+        return 0
     plans = [plan(HARDWARE[a.hardware], m, a.disk_gb, a.spec_rows, a.spec_accept) for m in models]
     if a.json:
         print(json.dumps([p.to_dict() for p in plans], indent=2))
