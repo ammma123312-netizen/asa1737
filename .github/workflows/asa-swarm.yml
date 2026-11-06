@@ -114,15 +114,24 @@ jobs:
           df -h / | tail -1
       - name: Preflight (services)
         run: python -m asa.swarm.preflight
-      - name: Node setup + stage this worker's experts locally (sparse, no FUSE)
+      - name: Node setup + stage this worker's experts in RAM (tmpfs), overflow on disk
         run: |
           k=$(( ${{ matrix.i }} - 1 )); n=${{ needs.plan.outputs.workers }}
-          ASA_STAGE="--owner $k/$n" ./asa/swarm/node_setup.sh
+          # tmpfs pages count against the runner's memory: keep ~3 GB for the OS, the
+          # worker process and the page cache of any shards that overflow to disk.
+          avail=$(awk '/MemAvailable/ {printf "%d", $2/1048576}' /proc/meminfo)
+          budget=$(( avail > 5 ? avail - 3 : 1 ))
+          sudo mount -o remount,size=$(( budget + 1 ))G /dev/shm
+          mkdir -p /dev/shm/asa
+          echo "RAM budget ${budget} GB of ${avail} GB available" | tee -a "$GITHUB_STEP_SUMMARY"
+          ASA_STAGE="--owner $k/$n --ram-dir /dev/shm/asa --ram-budget-gb $budget" ./asa/swarm/node_setup.sh
+          grep "\[stage\] ram" "$HOME/asa-swarm/stage.log" | tee -a "$GITHUB_STEP_SUMMARY" || true
           tail -1 "$HOME/asa-swarm/stage.log" | tee -a "$GITHUB_STEP_SUMMARY"
           df -h / | tail -1
       - name: Start expert worker behind the authenticated guard
         run: |
-          CLUSTER_WORKER_CACHE=8 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
+          # Shards already sit in RAM (tmpfs): one cache slot per layer avoids a second copy.
+          CLUSTER_WORKER_CACHE=1 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
             > "$ASA_WORK/worker.log" 2>&1 &
           for _ in $(seq 1 90); do (echo > /dev/tcp/127.0.0.1/9100) 2>/dev/null && break; sleep 2; done
           # The guard (TLS + OIDC) listens on every interface so the coordinator can try a
