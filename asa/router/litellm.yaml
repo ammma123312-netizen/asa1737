@@ -1,0 +1,53 @@
+# ASA speed layer: one OpenAI-compatible endpoint in front of three tiers.
+#
+#   asa-fast  -> small local model (the bundled Qwen2.5-3B on :8001), answers in seconds
+#   asa-cloud -> free/cheap fast API (Groq), used when an API key is set
+#   asa-big   -> huge MoE through Colibrì (`coli serve` on :8000), slow, best quality
+#
+# The app keeps talking to a single host:  LLM_HOSTS=localhost:4000
+# Run:  pip install 'litellm[proxy]' && litellm --config asa/router/litellm.yaml --port 4000
+#
+# Model ids on the provider side change over time; check the provider's model
+# list before relying on a name below.
+
+model_list:
+  - model_name: asa-fast
+    litellm_params:
+      model: openai/qwen2.5-3b-instruct
+      api_base: http://127.0.0.1:8001/v1
+      api_key: "none"
+      timeout: 120
+
+  - model_name: asa-cloud
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+      timeout: 60
+
+  - model_name: asa-big
+    litellm_params:
+      model: openai/colibri
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/COLI_API_KEY
+      # A 744B model on streamed experts can take minutes per answer.
+      timeout: 1800
+      stream_timeout: 600
+
+router_settings:
+  # If the big model is down, busy or times out, answer from the next tier
+  # instead of leaving the user waiting.
+  fallbacks:
+    - asa-big: [asa-cloud, asa-fast]
+    - asa-cloud: [asa-fast]
+  num_retries: 1
+  # Colibrì serves one conversation per KV slot; queue rather than overload it.
+  max_parallel_requests: 2
+
+litellm_settings:
+  # Identical prompts are answered from cache instantly. For similar (not
+  # identical) prompts switch to type: redis-semantic or put GPTCache in front.
+  cache: true
+  cache_params:
+    type: local
+    ttl: 86400
+  request_timeout: 1800

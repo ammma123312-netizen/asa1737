@@ -1,5 +1,5 @@
 ---
-title: Odysseus
+title: ASA
 emoji: 🌊
 colorFrom: blue
 colorTo: indigo
@@ -8,7 +8,14 @@ app_port: 7000
 pinned: false
 ---
 
-# Odysseus
+# ASA
+
+> **ASA** is this repository's new name. It builds on the Odysseus self-hosted AI
+> workspace and adds tooling for running very large open models (700B+) on
+> limited hardware and GitHub Actions. See **[docs/asa/README.md](docs/asa/README.md)**
+> (Arabic) for the research, the 29-project catalog and the feasibility planner
+> (`python -m asa.planner`). Internal names (`odysseus` CLI, `ODYSSEUS_*` env vars)
+> are kept so existing setups keep working.
 
 ```
 ───────────────────────────────────────────────
