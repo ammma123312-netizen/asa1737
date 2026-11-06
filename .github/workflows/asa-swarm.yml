@@ -1,56 +1,84 @@
 name: ASA Swarm (763B, zero cost)
 
-# A Petals-style swarm built from free GitHub-hosted runners:
-#   * DeepSeek-V4.1-Flash (763B, MIT) at its native precision, token-exact
-#     (Colibri cluster mode: workers run routed experts, the coordinator keeps
-#     attention, routing and the engram table).
-#   * Weights are never downloaded in full: every node mounts the public
-#     Hugging Face repo through HFFS (asa/swarm/hffs.py) and reads only the
-#     bytes it needs. No account, key or payment anywhere.
-#   * Workers expose their port through bore (free public TCP relay) and find
-#     the coordinator through this run's own artifacts (asa/swarm/rendezvous.py).
+# A Petals-style swarm built from free GitHub-hosted runners, no account/key/payment:
+#   * DeepSeek-V4.1-Flash (763B, MIT) at native precision, token-exact (Colibri cluster
+#     mode: workers run routed experts; the coordinator keeps attention, routing, engram,
+#     and the DSpark draft head for lossless speculative decoding).
+#   * Every node mounts the public Hugging Face repo through HFFS (asa/swarm/hffs.py).
+#     Worker k of n prefetches exactly the experts Colibri will route to it:
+#     (expert + layer) % n == k. The coordinator prefetches the dense tensors.
+#   * Workers expose their port through a free relay (bore.pub, fallback: Cloudflare
+#     quick tunnel over WebSocket) and meet the coordinator through this run's artifacts.
 #
-# This is an experiment/benchmark of the ASA inference stack, started by hand.
-# GitHub's terms allow Actions for building and testing the project; do not turn
-# it into an always-on public service.
-#
-# Free plan: up to 20 concurrent jobs per account, 6 h per job.
+# Start it by: editing asa/swarm/request.json and pushing, Run workflow, or labelling an
+# issue `asa-ask` (the issue body is the prompt; the answer is posted as a comment).
+# Experiment/benchmark runs of the ASA engine, started by hand: not an always-on service.
+# Free plan: 20 concurrent jobs per account, 6 h per job.
 
 on:
   workflow_dispatch:
     inputs:
-      prompt:
-        description: "Prompt"
-        default: "ما هي عاصمة المملكة العربية السعودية؟"
-      ngen:
-        description: "Tokens to generate"
-        default: "64"
-      workers:
-        description: "Expert workers (coordinator + workers must stay <= 19 on the free plan)"
-        default: "16"
-      relay:
-        description: "bore relay host (bore.pub is the free public one)"
-        default: "bore.pub"
+      prompt: {description: "Prompt", default: "ما هي عاصمة المملكة العربية السعودية؟"}
+      ngen: {description: "Tokens to generate", default: "64"}
+      workers: {description: "Expert workers (1..18)", default: "16"}
+      relay: {description: "Relay order", default: "bore,cloudflare"}
+  push:
+    paths: ["asa/swarm/request.json"]
+  issues:
+    types: [labeled]
 
 permissions:
   contents: read
   actions: read
+  issues: write
+
+concurrency:
+  group: asa-swarm
+  cancel-in-progress: false
 
 env:
   REPO: deepseek-ai/DeepSeek-V4.1-Flash
-  BORE_VERSION: v0.6.0
+  PYTHONUNBUFFERED: "1"
 
 jobs:
   plan:
+    if: github.event_name != 'issues' || github.event.label.name == 'asa-ask'
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.m.outputs.matrix }}
+      matrix: ${{ steps.r.outputs.matrix }}
+      workers: ${{ steps.r.outputs.workers }}
+      relay: ${{ steps.r.outputs.relay }}
     steps:
-      - id: m
+      - uses: actions/checkout@v4
+      - id: r
+        env:
+          EVENT: ${{ github.event_name }}
+          IN_PROMPT: ${{ inputs.prompt }}
+          IN_NGEN: ${{ inputs.ngen }}
+          IN_WORKERS: ${{ inputs.workers }}
+          IN_RELAY: ${{ inputs.relay }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          n="${{ inputs.workers }}"
-          [ "$n" -ge 1 ] && [ "$n" -le 18 ] || { echo "workers must be 1..18"; exit 1; }
-          echo "matrix=$(python3 -c "import json;print(json.dumps(list(range(1,$n+1))))")" >> "$GITHUB_OUTPUT"
+          python3 - <<'EOF'
+          import json, os
+          req = json.load(open("asa/swarm/request.json"))
+          ev = os.environ["EVENT"]
+          if ev == "workflow_dispatch":
+              req.update(prompt=os.environ["IN_PROMPT"], ngen=int(os.environ["IN_NGEN"]),
+                         workers=int(os.environ["IN_WORKERS"]), relay=os.environ["IN_RELAY"])
+          elif ev == "issues":
+              req.update(prompt=os.environ["ISSUE_BODY"], issue=int(os.environ["ISSUE_NUMBER"]))
+          n = int(req["workers"])
+          assert 1 <= n <= 18, "workers must be 1..18 (free plan: 20 concurrent jobs)"
+          json.dump(req, open("request.resolved.json", "w"), ensure_ascii=False, indent=1)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"matrix={json.dumps(list(range(1, n + 1)))}\nworkers={n}\n"
+                      f"relay={req.get('relay', 'bore,cloudflare')}\n")
+          print(json.dumps(req, ensure_ascii=False, indent=1))
+          EOF
+      - uses: actions/upload-artifact@v4
+        with: {name: swarm-request, path: request.resolved.json, retention-days: 3}
 
   worker:
     needs: plan
@@ -60,91 +88,109 @@ jobs:
       fail-fast: false
       matrix:
         i: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      ASA_ROLE: worker-${{ matrix.i }}
+      ASA_RELAY: ${{ needs.plan.outputs.relay }}
     steps:
       - uses: actions/checkout@v4
       - name: Free disk for the expert cache
-        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
-      - name: Node setup (HFFS mount + Colibri)
-        run: CACHE_GB=50 ./asa/swarm/node_setup.sh
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost || true
+          df -h / | tail -1
+      - name: Preflight (services)
+        run: python3 -m asa.swarm.preflight
+      - name: Node setup + prefetch this worker's experts
+        run: |
+          k=$(( ${{ matrix.i }} - 1 )); n=${{ needs.plan.outputs.workers }}
+          free=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
+          export HFFS_ARGS="--warm-owner $k/$n"
+          CACHE_GB=$(( free > 40 ? free - 10 : 30 )) ./asa/swarm/node_setup.sh
+          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; grep -m1 Traceback "$ASA_WORK/hffs.log" && exit 1; done
+          grep warm "$ASA_WORK/hffs.log" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Start expert worker + relay
         run: |
-          # 14 expert slots per layer x 40 layers x 18.8 MB ~= 10.5 GB of the 16 GB runner;
-          # the rest of this worker's experts stay hot in the kernel page cache.
-          CLUSTER_WORKER_CACHE=14 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
+          CLUSTER_WORKER_CACHE=8 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
             > "$ASA_WORK/worker.log" 2>&1 &
-          curl -sL "https://github.com/ekzhang/bore/releases/download/$BORE_VERSION/bore-$BORE_VERSION-x86_64-unknown-linux-musl.tar.gz" | tar xz -C "$ASA_WORK"
-          nohup "$ASA_WORK/bore" local 9100 --to "${{ inputs.relay }}" > "$ASA_WORK/bore.log" 2>&1 &
-          for _ in $(seq 1 30); do grep -qo "${{ inputs.relay }}:[0-9]*" "$ASA_WORK/bore.log" && break; sleep 1; done
-          grep -o "${{ inputs.relay }}:[0-9]*" "$ASA_WORK/bore.log" | head -1 | tee addr.txt
-          [ -s addr.txt ] || { cat "$ASA_WORK/bore.log"; exit 1; }
+          for _ in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9100) 2>/dev/null && break; sleep 2; done
+          python3 -m asa.swarm.relay expose --port 9100 --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay" | tee addr.txt
       - uses: actions/upload-artifact@v4
-        with:
-          name: swarm-addr-${{ matrix.i }}
-          path: addr.txt
-          retention-days: 1
+        with: {name: "swarm-addr-${{ matrix.i }}", path: addr.txt, retention-days: 1}
       - name: Serve until the coordinator finishes
+        env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: python3 -m asa.swarm.rendezvous wait-done --timeout 19000 || true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Worker logs
         if: always()
-        run: tail -n 40 "$ASA_WORK/worker.log" "$ASA_WORK/hffs.log" 2>/dev/null || true
+        run: tail -n 30 "$ASA_WORK/worker.log" "$ASA_WORK/hffs.log" "$ASA_WORK"/relay/*.log 2>/dev/null || true
 
   coordinator:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 340
     env:
-      PROMPT: ${{ inputs.prompt }}
-      NGEN: ${{ inputs.ngen }}
+      ASA_ROLE: coordinator
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: swarm-request}
       - name: Free disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
-      - name: Node setup (HFFS mount + Colibri, dense tensors warmed)
+      - name: Preflight (services)
+        run: python3 -m asa.swarm.preflight
+      - name: Node setup (dense + draft head warmed)
         run: |
-          export HFFS_ARGS="--warm-include . --warm-exclude \.experts\.|engram"
+          export HFFS_ARGS="--warm-include . --warm-exclude ^layers\.[0-9]+\.ffn\.experts\.|engram"
           CACHE_GB=30 ./asa/swarm/node_setup.sh
-          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; done; grep warm "$ASA_WORK/hffs.log"
-      - name: Wait for workers
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; grep -m1 Traceback "$ASA_WORK/hffs.log" && exit 1; done
+          grep warm "$ASA_WORK/hffs.log" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Wait for workers, bridge, probe
+        env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: |
-          addrs=$(python3 -m asa.swarm.rendezvous wait-workers --count "${{ inputs.workers }}" --timeout 2400 --min 1)
+          raw=$(python3 -m asa.swarm.rendezvous wait-workers --count ${{ needs.plan.outputs.workers }} --timeout 3600 --min 1)
+          addrs=$(python3 -m asa.swarm.relay bridge --addrs "$raw" --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay")
           echo "WORKERS=$addrs" >> "$GITHUB_ENV"
-          echo "workers: $addrs"
-          python3 - "$addrs" <<'EOF'
-          import socket, sys, time
-          for a in sys.argv[1].split(","):
-              h, p = a.rsplit(":", 1); t = time.time()
-              try:
-                  socket.create_connection((h, int(p)), timeout=10).close()
-                  print(f"{a}: connect {1000*(time.time()-t):.0f} ms")
-              except OSError as e:
-                  print(f"{a}: {e}")
-          EOF
+          { echo "### Workers"; echo '```'; python3 -m asa.swarm.relay probe --addrs "$addrs"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Generate (763B, native precision, distributed)
         run: |
+          python3 -c "import json;r=json.load(open('request.resolved.json'));open('prompt.txt','w').write(r['prompt']);print(r['ngen'])" > ngen.txt
           start=$(date +%s)
-          V41_DIRECT=0 V41_STATS=1 \
-            "$COLI" run --model "$VIEW" --cluster-workers "$WORKERS" --ngen "$NGEN" --temp 0 "$PROMPT" \
-            | tee answer.txt
+          V41_DIRECT=0 V41_STATS=1 "$COLI" run --model "$VIEW" --cluster-workers "$WORKERS" \
+            --cap 2 --ctx 4096 --ngen "$(cat ngen.txt)" --temp 0 "$(cat prompt.txt)" \
+            > answer.raw 2> engine.err
           echo "ELAPSED=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+          sed -n '/────/,$p' answer.raw | tail -n +2 > answer.txt
+          cat answer.txt
       - name: Report
         if: always()
         run: |
           {
             echo "## ASA Swarm: DeepSeek-V4.1-Flash 763B on free runners"
-            echo "workers: \`${WORKERS:-none}\`  ·  wall: ${ELAPSED:-n/a} s  ·  ngen: $NGEN"
-            echo '```'; tail -n 60 answer.txt 2>/dev/null; echo '```'
-            echo '```'; tail -n 5 "$ASA_WORK/hffs.log" 2>/dev/null; echo '```'
+            echo "workers: ${{ needs.plan.outputs.workers }} · wall: ${ELAPSED:-n/a} s"
+            echo "### Prompt"; echo '```'; cat prompt.txt 2>/dev/null; echo; echo '```'
+            echo "### Answer"; echo '```'; cat answer.txt 2>/dev/null; echo '```'
+            echo "### Engine stats"; echo '```'; grep -v '^\[api\]' engine.err 2>/dev/null | tail -n 25; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Answer the issue
+        if: github.event_name == 'issues' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          { echo "**DeepSeek-V4.1-Flash 763B** (ASA swarm, ${{ needs.plan.outputs.workers }} free runners, ${ELAPSED}s):"; echo
+            cat answer.txt; echo; echo "---"; echo "_Generated by the ASA Swarm workflow_"; } > comment.md
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file comment.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swarm-result
+          path: |
+            prompt.txt
+            answer.txt
+            engine.err
+          retention-days: 7
       - name: Release workers
         if: always()
         run: echo done > done.txt
       - uses: actions/upload-artifact@v4
         if: always()
-        with:
-          name: swarm-done
-          path: done.txt
-          retention-days: 1
+        with: {name: swarm-done, path: done.txt, retention-days: 1}

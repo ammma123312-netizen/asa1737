@@ -79,3 +79,21 @@ def test_cache_evicts_to_its_budget(tmp_path):
 def test_rendezvous_parses_relay_addresses():
     assert parse_addresses(["bore.pub:4001\n", "bore.pub:4000", "junk", "bore.pub:4001"]) == \
         ["bore.pub:4000", "bore.pub:4001"]
+
+
+def test_rendezvous_orders_workers_by_matrix_index():
+    from asa.swarm.rendezvous import order_by_index
+    named = [("swarm-addr-10", "bore.pub:1"), ("swarm-addr-2", "bore.pub:9"), ("swarm-addr-1", "bore.pub:5")]
+    assert order_by_index(named) == ["bore.pub:5", "bore.pub:9", "bore.pub:1"]
+
+
+def test_owner_selector_matches_colibri_ownership():
+    from asa.swarm.hffs import owner_selector
+    n = 18
+    owners = {k: owner_selector(k, n) for k in range(n)}
+    for layer in (0, 7, 39):
+        for e in (0, 5, 383):
+            name = f"layers.{layer}.ffn.experts.{e}.w2.weight"
+            assert [k for k in range(n) if owners[k](name)] == [(e + layer) % n]
+    assert not owners[0]("layers.0.ffn.shared_experts.w1.weight")
+    assert not owners[0]("mtp.0.ffn.experts.0.w1.weight")

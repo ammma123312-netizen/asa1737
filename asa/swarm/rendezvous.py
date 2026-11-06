@@ -67,11 +67,26 @@ def parse_addresses(texts: list[str]) -> list[str]:
     return sorted(out)
 
 
+def order_by_index(named: list[tuple[str, str]]) -> list[str]:
+    """[(artifact name, text)] -> addresses ordered by the worker index in the name.
+
+    Order matters: Colibri gives worker k (position in --cluster-workers) the experts
+    with (expert + layer) % n == k, and each worker prefetched exactly that share
+    (hffs --warm-owner k/n). Worker i (1-based matrix index) must sit at position i-1."""
+    rows = []
+    for name, text in named:
+        idx = name[len(ADDR_PREFIX):]
+        addr = parse_addresses([text])
+        if idx.isdigit() and addr:
+            rows.append((int(idx), addr[0]))
+    return [a for _, a in sorted(rows)]
+
+
 def wait_workers(count: int, timeout: float, poll: float = 15) -> list[str]:
     deadline = time.time() + timeout
     while True:
         arts = [a for a in list_artifacts() if a["name"].startswith(ADDR_PREFIX)]
-        addrs = parse_addresses([read_artifact_text(a) for a in arts])
+        addrs = order_by_index([(a["name"], read_artifact_text(a)) for a in arts])
         print(f"[rendezvous] {len(addrs)}/{count} workers", file=sys.stderr, flush=True)
         if len(addrs) >= count or time.time() > deadline:
             return addrs

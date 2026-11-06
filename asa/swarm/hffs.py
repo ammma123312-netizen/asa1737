@@ -29,7 +29,9 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import stat
+import struct
 import sys
 import threading
 import time
@@ -291,22 +293,49 @@ def build_ops(repo: HubRepo, cache: BlockCache, block: int, small_block: int, sm
     return Ops()
 
 
-def safetensors_ranges(repo: HubRepo, include, exclude) -> list[tuple[str, int, int]]:
-    """Byte ranges of tensors whose names match `include` and not `exclude` (regexes)."""
-    import re
-    import struct
+EXPERT_RE = re.compile(r"^layers\.(\d+)\.ffn\.experts\.(\d+)\.")
+
+
+def regex_selector(include: str, exclude: str | None = None):
     inc, exc = re.compile(include), re.compile(exclude) if exclude else None
-    out = []
-    for path in sorted(p for p in repo.files if p.endswith(".safetensors")):
+    return lambda name: bool(inc.search(name)) and not (exc and exc.search(name))
+
+
+def owner_selector(k: int, n: int):
+    """Routed experts owned by cluster worker k of n in Colibri's DeepSeek-V4.1 cluster:
+    expert E of layer L goes to worker (E + L) % n (deepseek_v41.c, cluster_moe_batch)."""
+    if not 0 <= k < n:
+        raise ValueError("need 0 <= K < N")
+
+    def sel(name: str) -> bool:
+        m = EXPERT_RE.match(name)
+        return bool(m) and (int(m.group(2)) + int(m.group(1))) % n == k
+    return sel
+
+
+def parse_owner(spec: str) -> tuple[int, int]:
+    k, n = (int(x) for x in spec.split("/"))
+    owner_selector(k, n)  # validates
+    return k, n
+
+
+def safetensors_ranges(repo: HubRepo, select, threads: int = 16) -> list[tuple[str, int, int]]:
+    """Byte ranges of every tensor whose name satisfies `select(name)`.
+
+    `select` may also be a regex string (kept for callers that pass one)."""
+    if isinstance(select, str):
+        select = regex_selector(select)
+    paths = sorted(p for p in repo.files if p.endswith(".safetensors"))
+
+    def one(path):
         n = struct.unpack("<Q", repo.read_range(path, 0, 8))[0]
         header = json.loads(repo.read_range(path, 8, 8 + n))
         base = 8 + n
-        for name, meta in header.items():
-            if name == "__metadata__" or not inc.search(name) or (exc and exc.search(name)):
-                continue
-            lo, hi = meta["data_offsets"]
-            out.append((path, base + lo, base + hi))
-    return out
+        return [(path, base + m["data_offsets"][0], base + m["data_offsets"][1])
+                for name, m in header.items() if name != "__metadata__" and select(name)]
+
+    with ThreadPoolExecutor(threads) as ex:
+        return [r for rs in ex.map(one, paths) for r in rs]
 
 
 def warm(repo: HubRepo, cache: BlockCache, block: int, ranges, threads: int = 32) -> int:
@@ -355,6 +384,8 @@ def main(argv=None) -> int:
     ap.add_argument("--warm-include", default=None, metavar="REGEX",
                     help="prefetch safetensors tensors matching this at mount time")
     ap.add_argument("--warm-exclude", default=None, metavar="REGEX")
+    ap.add_argument("--warm-owner", default=None, metavar="K/N",
+                    help="prefetch the routed experts cluster worker K of N will own")
     ap.add_argument("--make-view", nargs=2, metavar=("MOUNT", "VIEW"))
     ap.add_argument("--list", action="store_true", help="print files and sizes, then exit")
     a = ap.parse_args(argv)
@@ -387,10 +418,15 @@ def main(argv=None) -> int:
 
     threading.Thread(target=stats, daemon=True).start()
 
+    selectors = []
     if a.warm_include:
+        selectors.append(regex_selector(a.warm_include, a.warm_exclude))
+    if a.warm_owner:
+        selectors.append(owner_selector(*parse_owner(a.warm_owner)))
+    if selectors:
         def do_warm():
             t = time.time()
-            rs = safetensors_ranges(repo, a.warm_include, a.warm_exclude)
+            rs = safetensors_ranges(repo, lambda name: any(f(name) for f in selectors), a.threads)
             want = sum(hi - lo for _, lo, hi in rs)
             print(f"[hffs] warming {len(rs)} tensors, {want/1e9:.2f} GB", flush=True)
             got = warm(repo, cache, int(a.block_mb * 2**20), rs, a.threads)
