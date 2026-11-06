@@ -2,17 +2,23 @@ name: ASA Swarm (763B, zero cost)
 
 # A Petals-style swarm built from free GitHub-hosted runners, no account/key/payment:
 #   * DeepSeek-V4.1-Flash (763B, MIT) at native precision, token-exact (Colibri cluster
-#     mode: workers run routed experts; the coordinator keeps attention, routing, engram,
+#     mode: workers run routed experts; the coordinator keeps attention, routing, engram
 #     and the DSpark draft head for lossless speculative decoding).
 #   * Every node mounts the public Hugging Face repo through HFFS (asa/swarm/hffs.py).
-#     Worker k of n prefetches exactly the experts Colibri will route to it:
-#     (expert + layer) % n == k. The coordinator prefetches the dense tensors.
-#   * Workers expose their port through a free relay (bore.pub, fallback: Cloudflare
-#     quick tunnel over WebSocket) and meet the coordinator through this run's artifacts.
+#     Worker k of n pre-stages exactly the experts Colibri will route to it
+#     ((expert + layer) % n == k) before it accepts work; the coordinator pre-stages
+#     the dense tensors.
+#   * Security: Colibri's port is never exposed. Each worker runs `relay guard`: TLS +
+#     a GitHub OIDC token minted for THIS repo and THIS run, verified against GitHub's
+#     keys, before a single byte reaches Colibri. No shared secret exists.
+#   * Reachability: the guard port goes through a free relay (bore.pub, fallback
+#     Cloudflare quick tunnel); workers meet the coordinator through run artifacts.
+#   * Optional API gateway for your chat app: if the repo secret ASA_API_KEY exists, the
+#     coordinator's OpenAI endpoint (`coli serve --api-key`) is published through a
+#     Cloudflare quick tunnel for `session_minutes`; the URL is in the run summary.
 #
-# Start it by: editing asa/swarm/request.json and pushing, Run workflow, or labelling an
-# issue `asa-ask` (the issue body is the prompt; the answer is posted as a comment).
-# Experiment/benchmark runs of the ASA engine, started by hand: not an always-on service.
+# Start: edit asa/swarm/request.json and push, Run workflow, or label an issue `asa-ask`.
+# Manual, time-boxed experiment runs of the ASA engine — not an always-on service.
 # Free plan: 20 concurrent jobs per account, 6 h per job.
 
 on:
@@ -31,6 +37,7 @@ permissions:
   contents: read
   actions: read
   issues: write
+  id-token: write
 
 concurrency:
   group: asa-swarm
@@ -93,82 +100,106 @@ jobs:
       ASA_RELAY: ${{ needs.plan.outputs.relay }}
     steps:
       - uses: actions/checkout@v4
-      - name: Free disk for the expert cache
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -q "PyJWT[crypto]"
+      - name: Free disk for the expert shard
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
                       /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost || true
           df -h / | tail -1
       - name: Preflight (services)
-        run: python3 -m asa.swarm.preflight
-      - name: Node setup + prefetch this worker's experts
+        run: python -m asa.swarm.preflight
+      - name: Node setup + pre-stage this worker's experts
         run: |
           k=$(( ${{ matrix.i }} - 1 )); n=${{ needs.plan.outputs.workers }}
           free=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
           export HFFS_ARGS="--warm-owner $k/$n"
           CACHE_GB=$(( free > 40 ? free - 10 : 30 )) ./asa/swarm/node_setup.sh
-          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; grep -m1 Traceback "$ASA_WORK/hffs.log" && exit 1; done
+          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; if grep -q Traceback "$ASA_WORK/hffs.log"; then cat "$ASA_WORK/hffs.log"; exit 1; fi; done
           grep warm "$ASA_WORK/hffs.log" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Start expert worker + relay
+      - name: Start expert worker behind the authenticated guard
         run: |
           CLUSTER_WORKER_CACHE=8 V41_DIRECT=0 nohup "$COLI" cluster worker --model "$VIEW" --port 9100 \
             > "$ASA_WORK/worker.log" 2>&1 &
-          for _ in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9100) 2>/dev/null && break; sleep 2; done
-          python3 -m asa.swarm.relay expose --port 9100 --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay" | tee addr.txt
+          for _ in $(seq 1 90); do (echo > /dev/tcp/127.0.0.1/9100) 2>/dev/null && break; sleep 2; done
+          nohup python -m asa.swarm.relay guard --listen 9200 --target 9100 > "$ASA_WORK/guard.log" 2>&1 &
+          for _ in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/9200) 2>/dev/null && break; sleep 1; done
+          python -m asa.swarm.relay expose --port 9200 --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay" | tee addr.txt
       - uses: actions/upload-artifact@v4
         with: {name: "swarm-addr-${{ matrix.i }}", path: addr.txt, retention-days: 1}
       - name: Serve until the coordinator finishes
         env: {GITHUB_TOKEN: "${{ github.token }}"}
-        run: python3 -m asa.swarm.rendezvous wait-done --timeout 19000 || true
+        run: python -m asa.swarm.rendezvous wait-done --timeout 19000 || true
       - name: Worker logs
         if: always()
-        run: tail -n 30 "$ASA_WORK/worker.log" "$ASA_WORK/hffs.log" "$ASA_WORK"/relay/*.log 2>/dev/null || true
+        run: tail -n 30 "$ASA_WORK/guard.log" "$ASA_WORK/worker.log" "$ASA_WORK/hffs.log" "$ASA_WORK"/relay/*.log 2>/dev/null || true
 
   coordinator:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 345
     env:
       ASA_ROLE: coordinator
+      ASA_API_KEY: ${{ secrets.ASA_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -q "PyJWT[crypto]"
       - uses: actions/download-artifact@v4
         with: {name: swarm-request}
       - name: Free disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
       - name: Preflight (services)
-        run: python3 -m asa.swarm.preflight
-      - name: Node setup (dense + draft head warmed)
+        run: python -m asa.swarm.preflight
+      - name: Node setup (dense tensors + draft head pre-staged)
         run: |
           export HFFS_ARGS="--warm-include . --warm-exclude ^layers\.[0-9]+\.ffn\.experts\.|engram"
           CACHE_GB=30 ./asa/swarm/node_setup.sh
-          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; grep -m1 Traceback "$ASA_WORK/hffs.log" && exit 1; done
+          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; if grep -q Traceback "$ASA_WORK/hffs.log"; then cat "$ASA_WORK/hffs.log"; exit 1; fi; done
           grep warm "$ASA_WORK/hffs.log" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Wait for workers, bridge, probe
+      - name: Wait for workers, authenticated tunnels, probe
         env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: |
-          raw=$(python3 -m asa.swarm.rendezvous wait-workers --count ${{ needs.plan.outputs.workers }} --timeout 3600 --min 1)
-          addrs=$(python3 -m asa.swarm.relay bridge --addrs "$raw" --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay")
-          echo "WORKERS=$addrs" >> "$GITHUB_ENV"
-          { echo "### Workers"; echo '```'; python3 -m asa.swarm.relay probe --addrs "$addrs"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Generate (763B, native precision, distributed)
+          raw=$(python -m asa.swarm.rendezvous wait-workers --count ${{ needs.plan.outputs.workers }} --timeout 3600 --min 1)
+          bridged=$(python -m asa.swarm.relay bridge --addrs "$raw" --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay")
+          nohup python -m asa.swarm.relay connect --addrs "$bridged" > "$ASA_WORK/connect.out" 2> "$ASA_WORK/connect.log" &
+          for _ in $(seq 1 30); do [ -s "$ASA_WORK/connect.out" ] && break; sleep 1; done
+          echo "WORKERS=$(head -1 "$ASA_WORK/connect.out")" >> "$GITHUB_ENV"
+          { echo "### Workers (relay addresses)"; echo '```'; python -m asa.swarm.relay probe --addrs "$bridged"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Start the OpenAI endpoint (763B, native precision, distributed)
         run: |
-          python3 -c "import json;r=json.load(open('request.resolved.json'));open('prompt.txt','w').write(r['prompt']);print(r['ngen'])" > ngen.txt
-          start=$(date +%s)
-          V41_DIRECT=0 V41_STATS=1 "$COLI" run --model "$VIEW" --cluster-workers "$WORKERS" \
-            --cap 2 --ctx 4096 --ngen "$(cat ngen.txt)" --temp 0 "$(cat prompt.txt)" \
-            > answer.raw 2> engine.err
-          echo "ELAPSED=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
-          sed -n '/────/,$p' answer.raw | tail -n +2 > answer.txt
-          cat answer.txt
+          key="${ASA_API_KEY:-$(python -c 'import secrets;print(secrets.token_hex(16))')}"
+          echo "::add-mask::$key"; echo "LOCAL_KEY=$key" >> "$GITHUB_ENV"
+          V41_DIRECT=0 V41_STATS=1 nohup "$COLI" serve --model "$VIEW" --model-id deepseek-v4.1-flash \
+            --host 127.0.0.1 --port 8000 --api-key "$key" --cluster-workers "$WORKERS" \
+            --cap 2 --ctx 4096 > "$ASA_WORK/serve.out" 2> engine.err &
+      - name: Public API gateway (only if the ASA_API_KEY secret exists)
+        if: env.ASA_API_KEY != ''
+        run: |
+          url=$(python -m asa.swarm.relay expose-http --port 8000 --bin-dir "$ASA_WORK/bin" --log-dir "$ASA_WORK/relay")
+          { echo "### API gateway"; echo "Base URL: \`$url/v1\` · model \`deepseek-v4.1-flash\` · auth: your ASA_API_KEY"; } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Run the requested task
+        run: |
+          python -c "import json;r=json.load(open('request.resolved.json'));open('prompt.txt','w').write(r['prompt']);print(r['ngen'])" > ngen.txt
+          python -m asa.swarm.ask --key "$LOCAL_KEY" --prompt-file prompt.txt --max-tokens "$(cat ngen.txt)" --out result.json | tee answer.txt
+      - name: Keep the gateway open for the session
+        if: env.ASA_API_KEY != ''
+        run: |
+          mins=$(python -c "import json;print(int(json.load(open('request.resolved.json')).get('session_minutes', 0)))")
+          echo "serving for $mins more minutes"; sleep $(( mins * 60 ))
       - name: Report
         if: always()
         run: |
           {
             echo "## ASA Swarm: DeepSeek-V4.1-Flash 763B on free runners"
-            echo "workers: ${{ needs.plan.outputs.workers }} · wall: ${ELAPSED:-n/a} s"
+            echo "workers: ${{ needs.plan.outputs.workers }}"
             echo "### Prompt"; echo '```'; cat prompt.txt 2>/dev/null; echo; echo '```'
             echo "### Answer"; echo '```'; cat answer.txt 2>/dev/null; echo '```'
+            echo "### Timing"; echo '```'; python -c "import json;r=json.load(open('result.json'));r.pop('answer');print(json.dumps(r,indent=1))" 2>/dev/null; echo '```'
             echo "### Engine stats"; echo '```'; grep -v '^\[api\]' engine.err 2>/dev/null | tail -n 25; echo '```'
+            echo "### Auth"; echo '```'; tail -n 5 "$ASA_WORK/connect.log" 2>/dev/null; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Answer the issue
         if: github.event_name == 'issues' && success()
@@ -176,7 +207,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
-          { echo "**DeepSeek-V4.1-Flash 763B** (ASA swarm, ${{ needs.plan.outputs.workers }} free runners, ${ELAPSED}s):"; echo
+          { echo "**DeepSeek-V4.1-Flash 763B** (ASA swarm, ${{ needs.plan.outputs.workers }} free runners):"; echo
             cat answer.txt; echo; echo "---"; echo "_Generated by the ASA Swarm workflow_"; } > comment.md
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file comment.md
       - uses: actions/upload-artifact@v4
@@ -186,6 +217,7 @@ jobs:
           path: |
             prompt.txt
             answer.txt
+            result.json
             engine.err
           retention-days: 7
       - name: Release workers

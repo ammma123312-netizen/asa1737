@@ -97,3 +97,64 @@ def test_owner_selector_matches_colibri_ownership():
             assert [k for k in range(n) if owners[k](name)] == [(e + layer) % n]
     assert not owners[0]("layers.0.ffn.shared_experts.w1.weight")
     assert not owners[0]("mtp.0.ffn.experts.0.w1.weight")
+
+
+# --- authenticated relay (guard/connect) -------------------------------------
+
+def _rsa_and_token(repo="owner/asa", run="42", aud="asa-swarm", iss="https://issuer.test"):
+    import time as _t
+    jwt = pytest.importorskip("jwt")
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = int(_t.time())
+    tok = jwt.encode({"repository": repo, "run_id": run, "aud": aud, "iss": iss,
+                      "iat": now, "exp": now + 300}, key, algorithm="RS256")
+    return key, tok
+
+
+def test_verifier_accepts_only_this_repo_and_run():
+    from asa.swarm.relay import make_verifier
+    key, good = _rsa_and_token()
+    verify = make_verifier("owner/asa", "42", key_for=lambda t: key.public_key(), issuer="https://issuer.test")
+    assert verify(good)["run_id"] == "42"
+    for bad in (_rsa_and_token(run="43")[1], _rsa_and_token(repo="evil/x")[1],
+                _rsa_and_token(aud="other")[1], "not-a-jwt"):
+        with pytest.raises(Exception):
+            verify(bad)
+
+
+def test_guard_and_connect_splice_only_after_auth(tmp_path):
+    import asyncio
+    from asa.swarm.relay import connect, guard, make_verifier, self_signed_context
+    key, good = _rsa_and_token()
+    _, wrong_run = _rsa_and_token(run="999")
+    verify = make_verifier("owner/asa", "42", key_for=lambda t: key.public_key(), issuer="https://issuer.test")
+
+    async def scenario():
+        async def echo(r, w):
+            w.write(b"COLIBRI:" + await r.read(5)); await w.drain(); w.close()
+        target = await asyncio.start_server(echo, "127.0.0.1", 0)
+        tport = target.sockets[0].getsockname()[1]
+        gport, good_port, bad_port = 28200, 28201, 28202
+        tasks = [asyncio.create_task(guard(gport, tport, verify, self_signed_context(str(tmp_path)), log=lambda m: None)),
+                 asyncio.create_task(connect([(good_port, f"127.0.0.1:{gport}")], lambda: good, log=lambda m: None)),
+                 asyncio.create_task(connect([(bad_port, f"127.0.0.1:{gport}")], lambda: wrong_run, log=lambda m: None))]
+        await asyncio.sleep(0.5)
+        r, w = await asyncio.open_connection("127.0.0.1", good_port)
+        w.write(b"hello"); await w.drain()
+        ok = await asyncio.wait_for(r.read(100), 5)
+        r, w = await asyncio.open_connection("127.0.0.1", bad_port)
+        w.write(b"hello"); await w.drain()
+        refused = await asyncio.wait_for(r.read(100), 5)
+        # a raw client that skips TLS/auth entirely must also get nothing from Colibri
+        r, w = await asyncio.open_connection("127.0.0.1", gport)
+        w.write(b"hello\n"); await w.drain()
+        raw = await asyncio.wait_for(r.read(100), 5)
+        for t in tasks:
+            t.cancel()
+        target.close()
+        return ok, refused, raw
+
+    ok, refused, raw = asyncio.run(scenario())
+    assert ok == b"COLIBRI:hello"
+    assert b"COLIBRI" not in refused and b"COLIBRI" not in raw

@@ -1,7 +1,8 @@
 {
-  "prompt": "ما هي عاصمة المملكة العربية السعودية؟",
-  "ngen": 8,
-  "workers": 2,
-  "relay": "bore,cloudflare",
-  "stage": "A: smoke test of relay, rendezvous, cluster and HFFS on free runners"
+ "prompt": "ما هي عاصمة المملكة العربية السعودية؟",
+ "ngen": 8,
+ "workers": 2,
+ "relay": "bore,cloudflare",
+ "session_minutes": 0,
+ "stage": "A: smoke test (authenticated relay, rendezvous, cluster, HFFS on free runners)"
 }

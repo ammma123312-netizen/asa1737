@@ -33,7 +33,7 @@ echo "[node] python env"
 echo "[node] mount $REPO (HFFS, cache ${CACHE_GB} GB)"
 mkdir -p "$WORK/mnt" "$WORK/cache"
 (cd "$HERE" && nohup "$WORK/venv/bin/python" -m asa.swarm.hffs "$REPO" "$WORK/mnt" \
-    --cache "$WORK/cache" --cache-gb "$CACHE_GB" --small-block '*-0004[78]-of-*' --readahead 0 \
+    --cache "$WORK/cache" --cache-gb "$CACHE_GB" --small-block '*-0004[78]-of-*' --small-block-kb 4 --readahead 0 \
     ${HFFS_ARGS:-} > "$WORK/hffs.log" 2>&1 &)
 for _ in $(seq 1 60); do [ -f "$WORK/mnt/config.json" ] && break; sleep 2; done
 [ -f "$WORK/mnt/config.json" ] || { cat "$WORK/hffs.log"; exit 1; }
