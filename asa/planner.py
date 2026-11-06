@@ -96,6 +96,10 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
              16, 256, 2000, 80, 6.8, "reference",
              "Measured decode 1.74 tok/s on the native checkpoint (13.8 s for 24 tokens) "
              "with 68% of experts cached; RAM size not stated, 256 GB assumed."),
+    Hardware("ccr-hffs-measured", "This container streaming DeepSeek-V4.1 763B from HF via HFFS",
+             4, 15, 100000, 15, 0.027, "free",
+             "Measured 2026-11: 89 GB of expert I/O in 3302 s (0.027 GB/s through the proxy); "
+             "matmul 43 s; output 'عاصمة المملكة العربية'; decode 3-5.5 min/token."),
     Hardware("kaggle-2xt4", "Kaggle free notebook, 2x T4 (approximate, unverified)",
              4, 29, 57, 20, 0.3, "free (~30 GPU h/week)",
              "Session-limited (9-12 h); disk/bandwidth figures are rough. Weights must be "
@@ -127,9 +131,10 @@ MODELS: dict[str, Model] = {m.id: m for m in (
           "Moonshot ships INT4 trained with QAT; INT4 is its original precision."),
     # Sizes/param counts read from the Hugging Face repos (2026-11).
     Model("deepseek-v4.1-flash-native", "DeepSeek-V4.1-Flash 763B, native FP4 experts + FP8 (no conversion)",
-          763, 16, 510, 24, "colibri",
+          763, 16, 510, 12, "colibri",
           "203 GB of it is an n-gram 'engram' table read ~13 KB/token; experts 4.5 GB/token. "
-          "Colibrì reads the released checkpoint as-is, token-exact (docs/deepseek-v41.md)."),
+          "Colibrì reads the released checkpoint as-is, token-exact (docs/deepseek-v41.md). "
+          "Measured: runs in 15 GB RAM (RSS 10.7 GB) with --cap 2 --ctx 1024."),
     Model("deepseek-v4-pro-native", "DeepSeek-V4-Pro 1.65T, native FP4 experts + FP8", 1650, 49, 893, 32,
           "ktransformers"),
     Model("deepseek-v4-flash-native", "DeepSeek-V4-Flash 304B, native FP4 experts + FP8", 304, 13, 167, 16,

@@ -179,3 +179,10 @@ def test_swarm_speed_is_latency_bound():
     # 40 round trips per token: halving RTT must help more than adding workers at 18.
     assert swarm_estimate(18, 15).warm_tok_s > 1.5 * swarm_estimate(18, 40).warm_tok_s
     assert swarm_estimate(18, 40).warm_tok_s < 1 / (40 * 0.040)
+
+
+def test_dsv41_streamed_from_hf_matches_measured_run():
+    # Measured here: 763B via HFFS in 15 GB RAM, decode 3-5.5 min/token.
+    p = plan(HARDWARE["ccr-hffs-measured"], MODELS["deepseek-v4.1-flash-native"])
+    assert p.mode == "expert-streaming"
+    assert 90 <= p.est_seconds_per_token <= 660, p.est_seconds_per_token  # within 2x of 180-330 s
