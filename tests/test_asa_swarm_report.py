@@ -32,13 +32,11 @@ def test_parse_engine_real_lines():
     assert e == {"expert_io_gb": 1.43, "t1_ms": 54733.5, "connected": 4, "load_s": None}
 
 
-@pytest.mark.parametrize("line,expect", [
-    ("[v41] model loaded in 12.3 s", 12.3),
-    ("load time: 4120 ms", 4.1),
-    ("[coli] loading weights ... 88.0s", 88.0),
-])
-def test_parse_load(line, expect):
-    assert rp.parse_engine(ENGINE + line + "\n")["load_s"] == expect
+def test_parse_load_real_line():
+    line = ("[v41] 40 layers, 384 experts/layer (6 routed), dim 5120, hc 4, window 128, "
+            "engram on \u2014 loaded in 255.35s")
+    assert rp.parse_engine(line + "\n" + ENGINE)["load_s"] == 255.35
+    assert rp.parse_engine("[v41] loaded in 3 s\n")["load_s"] is None  # only the exact format
 
 
 def test_no_cluster_and_last_io_wins():

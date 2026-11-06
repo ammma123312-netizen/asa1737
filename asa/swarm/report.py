@@ -32,8 +32,8 @@ DEFAULT_REPO = "ammma123312-netizen/odysseus"
 _IO = re.compile(r"expert I/O:[^\n]*?([\d.]+)\s*MB\b")
 _T1 = re.compile(r"DSpark gate:\s*T\(1\)\s*([\d.]+)\s*ms")
 _CLUSTER = re.compile(r"\[CLUSTER\] coordinator connected to (\d+)")
-# Model load time, e.g. "model loaded in 12.3 s" / "load time: 4120 ms" (first match wins).
-_LOAD = re.compile(r"\bload(?:ed|ing)?\b(?: time)?[^\n\d]{0,40}?([\d.]+)\s*(ms|s)\b", re.IGNORECASE)
+# Colibri prints e.g. "[v41] 40 layers, ... engram on — loaded in 255.35s".
+_LOAD = re.compile(r"loaded in ([0-9.]+)s\b")
 
 COLUMNS = ["run", "workers", "connected", "wall_s", "tokens", "tok/s", "load_s", "T(1) ms",
            "expert I/O GB", "answer"]
@@ -106,14 +106,9 @@ def parse_engine(text: str) -> dict:
     c = _CLUSTER.findall(text)
     if c:
         out["connected"] = int(c[-1])
-    for line in text.splitlines():
-        if "expert I/O" in line or "DSpark" in line:
-            continue
-        m = _LOAD.search(line)
-        if m:
-            v = float(m.group(1))
-            out["load_s"] = round(v / 1000 if m.group(2).lower() == "ms" else v, 1)
-            break
+    load = _LOAD.findall(text)
+    if load:
+        out["load_s"] = float(load[0])
     return out
 
 
