@@ -68,10 +68,10 @@ def test_cli_runs(capsys):
     assert '"mode": "impossible"' in out
 
 
-def test_catalog_has_at_least_20_unique_projects():
+def test_catalog_has_at_least_100_unique_projects():
     data = yaml.safe_load(CATALOG.read_text(encoding="utf-8"))
     projects = data["projects"]
-    assert len(projects) >= 20
+    assert len(projects) >= 100
     repos = [p["repo"] for p in projects]
     assert len(repos) == len(set(repos))
     categories = set(data["categories"])
@@ -141,3 +141,24 @@ def test_every_catalog_project_declares_quality_impact():
         assert p.get("quality") in ("lossless", "lossy", "depends"), p["name"]
     lossless = {p["name"] for p in data["projects"] if p["quality"] == "lossless"}
     assert {"vLLM", "EAGLE (speculative decoding)", "LMCache"} <= lossless
+
+
+# --- choosing the 700B-class model: GLM-5.2 vs DeepSeek, native precision --
+
+def test_dsv41_estimate_within_2x_of_colibri_measurement():
+    # docs/deepseek-v41.md: decode 13.8 s for 24 tokens = 1.74 tok/s, native checkpoint.
+    p = plan(HARDWARE["colibri-dsv41-ref"], MODELS["deepseek-v4.1-flash-native"])
+    assert 0.87 <= p.est_tokens_per_s <= 3.5, p.est_tokens_per_s
+
+
+def test_dsv41_native_beats_glm52_fp8_on_same_cheap_server():
+    hw = HARDWARE["hetzner-auction-64gb"]
+    ds = plan(hw, MODELS["deepseek-v4.1-flash-native"])
+    glm = plan(hw, MODELS["glm-5.2-fp8-native"])
+    assert ds.mode == glm.mode == "expert-streaming"
+    assert ds.est_tokens_per_s > 3 * glm.est_tokens_per_s
+
+
+def test_free_notebooks_cannot_serve_700b_class_usably():
+    p = plan(HARDWARE["kaggle-2xt4"], MODELS["deepseek-v4.1-flash-native"], disk_gb=100000)
+    assert p.est_tokens_per_s < 0.1

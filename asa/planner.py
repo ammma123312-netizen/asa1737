@@ -92,6 +92,14 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
              "Measured 2026-11: ~0.5 s per range request, ~0.08 GB/s with 16 parallel "
              "16 MB reads (the container's egress proxy may be slower than a runner). "
              "Needs a FUSE mount of the repo; never leaves the free tier, but slow."),
+    Hardware("colibri-dsv41-ref", "Colibrì's DeepSeek-V4.1 test server (16 threads, 2 striped PM9A1)",
+             16, 256, 2000, 80, 6.8, "reference",
+             "Measured decode 1.74 tok/s on the native checkpoint (13.8 s for 24 tokens) "
+             "with 68% of experts cached; RAM size not stated, 256 GB assumed."),
+    Hardware("kaggle-2xt4", "Kaggle free notebook, 2x T4 (approximate, unverified)",
+             4, 29, 57, 20, 0.3, "free (~30 GPU h/week)",
+             "Session-limited (9-12 h); disk/bandwidth figures are rough. Weights must be "
+             "re-downloaded or streamed each session.", vram_gb=32),
     Hardware("hetzner-auction-64gb", "Rented dedicated server: 64 GB RAM, 2x1 TB NVMe",
              8, 64, 1800, 40, 5.0, "~EUR 35-45/month (auction, 2026)",
              "Two NVMe drives: Colibrì's multidisk report measured GLM-5.2 0.80 -> 1.10 tok/s."),
@@ -117,6 +125,17 @@ MODELS: dict[str, Model] = {m.id: m for m in (
     Model("kimi-k2-int4-native", "Kimi K2 Thinking 1T, native INT4 (quantization-aware trained)",
           1000, 32, 594, 8, "ktransformers",
           "Moonshot ships INT4 trained with QAT; INT4 is its original precision."),
+    # Sizes/param counts read from the Hugging Face repos (2026-11).
+    Model("deepseek-v4.1-flash-native", "DeepSeek-V4.1-Flash 763B, native FP4 experts + FP8 (no conversion)",
+          763, 16, 510, 24, "colibri",
+          "203 GB of it is an n-gram 'engram' table read ~13 KB/token; experts 4.5 GB/token. "
+          "Colibrì reads the released checkpoint as-is, token-exact (docs/deepseek-v41.md)."),
+    Model("deepseek-v4-pro-native", "DeepSeek-V4-Pro 1.65T, native FP4 experts + FP8", 1650, 49, 893, 32,
+          "ktransformers"),
+    Model("deepseek-v4-flash-native", "DeepSeek-V4-Flash 304B, native FP4 experts + FP8", 304, 13, 167, 16,
+          "colibri", "Colibrì: 0.93 tok/s on CPU with 32 GB RAM."),
+    Model("glm-5.2-fp8-native", "GLM-5.2 753B, official FP8 release", 753, 40, 756, 24, "colibri",
+          "Official FP8 checkpoint (BF16 original is 1.5 TB). Colibrì's int4 container is a lossy conversion."),
     Model("glm-5.2", "GLM-5.2 (744B MoE, int4)", 744, 40, 429.3, 16, "colibri",
           "Colibrì int4-g64 + int8 MTP head."),
     Model("deepseek-r1-1.58bit", "DeepSeek-R1 671B, Unsloth dynamic 1.58-bit", 671, 37, 131, 8,
