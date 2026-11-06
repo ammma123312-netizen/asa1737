@@ -29,6 +29,9 @@ on:
       workers: {description: "Expert workers (1..19)", default: "19"}
       relay: {description: "Relay order", default: "bore,cloudflare"}
   push:
+    # Only the swarm owner's branch starts runs from request.json; helper branches that
+    # carry the file would otherwise launch (and pre-empt) full swarm runs.
+    branches: ["claude/asa-llm-projects-edw488", "main"]
     paths: ["asa/swarm/request.json"]
   issues:
     types: [labeled]
