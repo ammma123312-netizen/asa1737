@@ -179,7 +179,7 @@ python -m asa.planner --hardware workstation-128gb --model glm-5.2 --json
 | 3 | طبقة السرعة `asa/router/litellm.yaml` + هذا المستند | ✅ تم |
 | 4 | بناء Colibrì وتشغيل Qwen3-Coder-30B فعلياً (4 أنوية / 15 GB)، وقياس السرعة، ومعايرة المخطط | ✅ تم (≈2 رمز/ثانية) |
 | 4ب | تشغيل الورشة `asa-colibri` نفسها على GitHub | ⏭ التالي |
-| 5 | مشغّل ذاتي (حاسوبك بقرص NVMe ≥ 500 GB) لتشغيل GLM-5.2 عبر Issues بالوسم `asa-ask` | ⏭ |
+| 5 | مشغّل ذاتي: حاسوبك ينضم إلى السرب مجاناً، عبر `scripts/asa/self_hosted_runner.sh`، والشرح في [SELF_HOSTED.md](SELF_HOSTED.md). يُفعَّل في السرب بالقيمة `"runner": "asa"` في `asa/swarm/request.json` | ✅ تم (الجلسة المساعدة) |
 | 6 | ربط LiteLLM في `docker/entrypoint.sh` خلف متغير `ASA_ROUTER=1` (`asa/router/serve.sh`، `seed_endpoint.py`) | ✅ تم (الجلسة المساعدة) |
 | 7 | توجيه تلقائي `asa-auto`: الأسئلة البسيطة إلى `asa-fast`، والصعبة إلى `asa-deepseek` (`asa/router/auto_route.py`). **لم تُضَف الذاكرة المؤقتة الدلالية عمداً**، لأنها قد تعيد جواب سؤال مختلف، فتخالف شرط عدم خسارة الجودة | ✅ تم (الجلسة المساعدة) |
 | 8 | تجربة وضع cluster في Colibrì على جهازين | ⏭ |

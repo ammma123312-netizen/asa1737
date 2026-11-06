@@ -55,6 +55,7 @@ jobs:
       matrix: ${{ steps.r.outputs.matrix }}
       workers: ${{ steps.r.outputs.workers }}
       relay: ${{ steps.r.outputs.relay }}
+      runner: ${{ steps.r.outputs.runner }}
     steps:
       - uses: actions/checkout@v4
       - id: r
@@ -80,8 +81,11 @@ jobs:
           assert 1 <= n <= 16, "workers must be 1..16 (V41_CLUSTER_MAX_WORKERS in Colibri)"
           json.dump(req, open("request.resolved.json", "w"), ensure_ascii=False, indent=1)
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              # "runner": "ubuntu-latest" (free) or "asa" (your own PCs, docs/asa/SELF_HOSTED.md)
+              runner = req.get("runner", "ubuntu-latest")
+              runs_on = ["self-hosted", "asa"] if runner == "asa" else runner
               f.write(f"matrix={json.dumps(list(range(1, n + 1)))}\nworkers={n}\n"
-                      f"relay={req.get('relay', 'bore,cloudflare')}\n")
+                      f"relay={req.get('relay', 'bore,cloudflare')}\nrunner={json.dumps(runs_on)}\n")
           print(json.dumps(req, ensure_ascii=False, indent=1))
           EOF
       - uses: actions/upload-artifact@v4
@@ -89,7 +93,7 @@ jobs:
 
   worker:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.plan.outputs.runner) }}
     timeout-minutes: 350
     strategy:
       fail-fast: false
