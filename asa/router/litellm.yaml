@@ -1,16 +1,53 @@
-# ASA speed layer: one OpenAI-compatible endpoint in front of three tiers.
+# ASA final routing: one OpenAI-compatible endpoint, full-quality 700B-class model.
 #
-#   asa-fast  -> small local model (the bundled Qwen2.5-3B on :8001), answers in seconds
-#   asa-cloud -> free/cheap fast API (Groq), used when an API key is set
-#   asa-big   -> huge MoE through Colibrì (`coli serve` on :8000), slow, best quality
+# The model is DeepSeek-V4.1-Flash (763B, MIT, native FP4/FP8 weights). Every tier
+# below except asa-fast serves the SAME weights, so falling back never lowers quality.
 #
-# The app keeps talking to a single host:  LLM_HOSTS=localhost:4000
+#   asa-deepseek  -> NVIDIA NIM (free trial credits) -> OpenRouter (~$0.05 in / $0.57 out
+#                    per M tokens, checked 2026-11) -> your own server (Colibri, ~1 tok/s)
+#   asa-private   -> your own server only (prompts never leave your machine)
+#   asa-glm       -> GLM-5.2 via OpenRouter (same idea, for comparison/second opinion)
+#   asa-fast      -> small local model for instant/offline answers (lower quality, opt-in)
+#
+# Keys (set the ones you have; a tier without a valid key fails over to the next):
+#   LITELLM_MASTER_KEY  any long random string; the app uses it as its API key
+#   NVIDIA_NIM_API_KEY  build.nvidia.com      OPENROUTER_API_KEY  openrouter.ai
+#   ASA_SELFHOST_BASE   e.g. http://10.0.0.5:8000/v1 (scripts/asa/setup_dsv41_server.sh)
+#   COLI_API_KEY        if coli serve was started with --api-key
+#
 # Run:  pip install 'litellm[proxy]' && litellm --config asa/router/litellm.yaml --port 4000
-#
-# Model ids on the provider side change over time; check the provider's model
-# list before relying on a name below.
+# App:  LLM_HOSTS=localhost:4000
+# Provider model ids change; re-check with: python -m asa.check_providers
 
 model_list:
+  - model_name: asa-deepseek
+    litellm_params:
+      model: nvidia_nim/deepseek-ai/deepseek-v4.1-flash
+      api_key: os.environ/NVIDIA_NIM_API_KEY
+      timeout: 120
+    model_info: {id: dsv41-nim}
+
+  - model_name: asa-deepseek-openrouter
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4.1-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      timeout: 120
+
+  - model_name: asa-private
+    litellm_params:
+      model: openai/deepseek-v4.1-flash
+      api_base: os.environ/ASA_SELFHOST_BASE
+      api_key: os.environ/COLI_API_KEY
+      # Native 763B streamed from NVMe: minutes per long answer.
+      timeout: 3600
+      stream_timeout: 900
+
+  - model_name: asa-glm
+    litellm_params:
+      model: openrouter/z-ai/glm-5.2
+      api_key: os.environ/OPENROUTER_API_KEY
+      timeout: 120
+
   - model_name: asa-fast
     litellm_params:
       model: openai/qwen2.5-3b-instruct
@@ -18,36 +55,26 @@ model_list:
       api_key: "none"
       timeout: 120
 
-  - model_name: asa-cloud
-    litellm_params:
-      model: groq/llama-3.3-70b-versatile
-      api_key: os.environ/GROQ_API_KEY
-      timeout: 60
-
-  - model_name: asa-big
-    litellm_params:
-      model: openai/colibri   # start the engine with: coli serve --model DIR --model-id colibri
-      api_base: http://127.0.0.1:8000/v1
-      api_key: os.environ/COLI_API_KEY
-      # A 744B model on streamed experts can take minutes per answer.
-      timeout: 1800
-      stream_timeout: 600
-
 router_settings:
-  # If the big model is down, busy or times out, answer from the next tier
-  # instead of leaving the user waiting.
+  # Same-weights fallbacks only: quality never drops when a tier is down or rate-limited.
   fallbacks:
-    - asa-big: [asa-cloud, asa-fast]
-    - asa-cloud: [asa-fast]
+    - asa-deepseek: [asa-deepseek-openrouter, asa-private]
+    - asa-deepseek-openrouter: [asa-private]
+    - asa-glm: [asa-deepseek]
   num_retries: 1
-  # Colibrì serves one conversation per KV slot; queue rather than overload it.
-  max_parallel_requests: 2
+  # Colibri serves one conversation per KV slot; queue rather than overload it.
+  max_parallel_requests: 4
+
+general_settings:
+  # Required: recent LiteLLM refuses to start an unauthenticated proxy.
+  # Clients (the app) send it as the API key: Authorization: Bearer $LITELLM_MASTER_KEY
+  master_key: os.environ/LITELLM_MASTER_KEY
 
 litellm_settings:
-  # Identical prompts are answered from cache instantly. For similar (not
-  # identical) prompts switch to type: redis-semantic or put GPTCache in front.
+  # Exact-match cache only: identical request -> identical stored answer (lossless).
+  # Do not switch to a semantic cache if "no quality loss" matters.
   cache: true
   cache_params:
     type: local
     ttl: 86400
-  request_timeout: 1800
+  request_timeout: 3600

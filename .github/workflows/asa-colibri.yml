@@ -6,7 +6,7 @@ name: ASA Colibri run
 # What fits where (see `python -m asa.planner --list`):
 #   * free ubuntu-latest (16 GB RAM, ~70 GB disk after cleanup):
 #       qwen3-coder-30b-a3b (19 GB) or qwen3.6-35b-a3b (23 GB)
-#   * GLM-5.2 744B (429 GB of weights) needs a larger runner or a
+#   * DeepSeek-V4.1-Flash 763B native (510 GB) and GLM-5.2 (429 GB int4) need a larger runner or a
 #     self-hosted runner with a big NVMe disk; set `runner` accordingly.
 #     The planner gate below stops the job before a download that cannot fit.
 #
@@ -23,7 +23,7 @@ on:
         description: "Model to run"
         type: choice
         default: qwen3-coder-30b-a3b
-        options: [qwen3-coder-30b-a3b, qwen3.6-35b-a3b, glm-5.2]
+        options: [qwen3-coder-30b-a3b, qwen3.6-35b-a3b, deepseek-v4.1-flash-native, glm-5.2]
       prompt:
         description: "Prompt"
         default: "Write a Python function that checks whether a number is prime."
@@ -72,6 +72,7 @@ jobs:
             qwen3-coder-30b-a3b) echo "HF_REPO=Justvugg/Qwen3-Coder-30B-A3B-colibri-int4" >> "$GITHUB_ENV"; echo "ENGINE=qwen36" >> "$GITHUB_ENV" ;;
             qwen3.6-35b-a3b)     echo "HF_REPO=Kreuzzelg/qwen36-35b-a3b-colibri-i4-gs64" >> "$GITHUB_ENV"; echo "ENGINE=qwen36" >> "$GITHUB_ENV" ;;
             glm-5.2)             echo "HF_REPO=mastouri/GLM-5.2-colibri-int4-g64-with-int8-mtp" >> "$GITHUB_ENV"; echo "ENGINE=glm" >> "$GITHUB_ENV" ;;
+            deepseek-v4.1-flash-native) echo "HF_REPO=deepseek-ai/DeepSeek-V4.1-Flash" >> "$GITHUB_ENV"; echo "ENGINE=deepseek_v41" >> "$GITHUB_ENV" ;;
             *) echo "unknown model $MODEL"; exit 1 ;;
           esac
 
@@ -113,6 +114,13 @@ jobs:
           snapshot_download(os.environ["HF_REPO"], local_dir=os.path.join(os.environ["MODEL_DIR"], os.environ["MODEL"]))
           EOF
           du -sh "$MODEL_DIR/$MODEL"; df -h /
+
+      - name: Prepare DeepSeek-V4.1 engram sidecar
+        if: env.ENGINE == 'deepseek_v41'
+        working-directory: ${{ runner.temp }}/colibri
+        run: |
+          pip install -q transformers tokenizers numpy sympy
+          python c/tools/prepare_dsv41.py --model "$MODEL_DIR/$MODEL"
 
       - name: Doctor
         working-directory: ${{ runner.temp }}/colibri/c
