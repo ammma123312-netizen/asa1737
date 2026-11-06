@@ -162,3 +162,20 @@ def test_dsv41_native_beats_glm52_fp8_on_same_cheap_server():
 def test_free_notebooks_cannot_serve_700b_class_usably():
     p = plan(HARDWARE["kaggle-2xt4"], MODELS["deepseek-v4.1-flash-native"], disk_gb=100000)
     assert p.est_tokens_per_s < 0.1
+
+
+# --- zero-cost swarm of free runners ---------------------------------------
+
+def test_swarm_more_workers_hold_more_experts_and_go_faster():
+    from asa.planner import swarm_estimate
+    small, big = swarm_estimate(4, 40), swarm_estimate(18, 40)
+    assert big.expert_coverage > small.expert_coverage
+    assert big.warm_tok_s > small.warm_tok_s
+    assert big.cold_s_per_token < small.cold_s_per_token
+
+
+def test_swarm_speed_is_latency_bound():
+    from asa.planner import swarm_estimate
+    # 40 round trips per token: halving RTT must help more than adding workers at 18.
+    assert swarm_estimate(18, 15).warm_tok_s > 1.5 * swarm_estimate(18, 40).warm_tok_s
+    assert swarm_estimate(18, 40).warm_tok_s < 1 / (40 * 0.040)

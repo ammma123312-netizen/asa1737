@@ -101,8 +101,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Free disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
-      - name: Node setup (HFFS mount + Colibri)
-        run: CACHE_GB=30 ./asa/swarm/node_setup.sh
+      - name: Node setup (HFFS mount + Colibri, dense tensors warmed)
+        run: |
+          export HFFS_ARGS="--warm-include . --warm-exclude \.experts\.|engram"
+          CACHE_GB=30 ./asa/swarm/node_setup.sh
+          until grep -q "warm done" "$ASA_WORK/hffs.log"; do sleep 10; done; grep warm "$ASA_WORK/hffs.log"
       - name: Wait for workers
         env:
           GITHUB_TOKEN: ${{ github.token }}

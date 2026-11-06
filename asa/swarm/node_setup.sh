@@ -11,6 +11,10 @@ REPO="${REPO:-deepseek-ai/DeepSeek-V4.1-Flash}"
 WORK="${WORK:-$HOME/asa-swarm}"
 COLIBRI_REF="${COLIBRI_REF:-0a5504a1dc64f86fcd0fe7db298b0448c730e7e6}"
 CACHE_GB="${CACHE_GB:-40}"
+# Coordinator: HFFS_ARGS="--warm-include . --warm-exclude '\.experts\.|engram'" prefetches the
+# ~11 GB of dense tensors in parallel (measured 142 MB/s vs ~8 MB/s for the engine's own
+# sequential load). Readahead stays off: dense and expert tensors are interleaved in
+# every shard, so guessing the next bytes mostly fetched experts nobody asked for.
 ENGINE="${ENGINE:-deepseek_v41}"
 HERE="$(cd "$(dirname "$0")/../.." && pwd)"
 SUDO=""; [ "$(id -u)" = "0" ] || SUDO="sudo"
@@ -29,8 +33,8 @@ echo "[node] python env"
 echo "[node] mount $REPO (HFFS, cache ${CACHE_GB} GB)"
 mkdir -p "$WORK/mnt" "$WORK/cache"
 (cd "$HERE" && nohup "$WORK/venv/bin/python" -m asa.swarm.hffs "$REPO" "$WORK/mnt" \
-    --cache "$WORK/cache" --cache-gb "$CACHE_GB" --small-block '*-0004[78]-of-*' \
-    > "$WORK/hffs.log" 2>&1 &)
+    --cache "$WORK/cache" --cache-gb "$CACHE_GB" --small-block '*-0004[78]-of-*' --readahead 0 \
+    ${HFFS_ARGS:-} > "$WORK/hffs.log" 2>&1 &)
 for _ in $(seq 1 60); do [ -f "$WORK/mnt/config.json" ] && break; sleep 2; done
 [ -f "$WORK/mnt/config.json" ] || { cat "$WORK/hffs.log"; exit 1; }
 head -1 "$WORK/hffs.log"

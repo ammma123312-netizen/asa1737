@@ -307,6 +307,43 @@ def requirements(m: Model, target_tps: float, spec_accept: float = 1.0) -> Requi
     return Requirement(m.id, target_tps, spec_accept, round(mem), round(bw), ex)
 
 
+@dataclass
+class SwarmEstimate:
+    workers: int
+    rtt_ms: float
+    expert_coverage: float     # share of all routed experts held in workers' RAM
+    warm_tok_s: float          # steady state, hot experts resident
+    cold_s_per_token: float    # first touches stream from Hugging Face
+    notes: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def swarm_estimate(workers: int, rtt_ms: float = 40.0, worker_ram_gb: float = 16.0,
+                   worker_disk_cache_gb: float = 50.0, net_mb_s: float = 150.0,
+                   disk_gb_s: float = 1.0, coordinator_mem_bw_gbs: float = 15.0) -> SwarmEstimate:
+    """DeepSeek-V4.1-Flash spread over free runners (Colibrì cluster mode).
+
+    Measured inputs (docs/deepseek-v41.md, HF headers): 40 MoE layers, 6 of 384
+    routed experts per layer per token, 18.8 MB each (296 GB total); the
+    coordinator keeps ~11 GB resident and reads ~8.3 GB of it per token.
+    Each token costs one coordinator->workers round trip per layer (workers in
+    parallel), plus each worker's share of the routed experts, served from its
+    RAM, else its HFFS disk cache, else the Hugging Face CDN."""
+    layers, experts_gb, per_token_experts_gb, dense_per_token_gb = 40, 296.0, 4.5, 8.3
+    n = max(workers, 1)
+    ram_cov = min(1.0, max(0.0, worker_ram_gb - 3.0) * n / experts_gb)
+    disk_cov = min(1.0, (max(0.0, worker_ram_gb - 3.0) + worker_disk_cache_gb) * n / experts_gb)
+    share = per_token_experts_gb / n                       # GB each worker touches per token
+    fixed = dense_per_token_gb / coordinator_mem_bw_gbs + layers * rtt_ms / 1000 + share / 10.0
+    warm = fixed + share * (disk_cov - ram_cov) / disk_gb_s + share * (1 - disk_cov) / (net_mb_s / 1000)
+    cold = fixed + share / (net_mb_s / 1000)               # every expert still on the CDN
+    note = (f"RAM holds {ram_cov:.0%} of experts, RAM+disk cache {disk_cov:.0%}; "
+            f"latency floor {layers * rtt_ms / 1000:.1f} s/token from {layers} round trips")
+    return SwarmEstimate(workers, rtt_ms, round(ram_cov, 2), round(1 / warm, 2), round(cold, 1), note)
+
+
 def _fmt(p: Plan) -> str:
     lines = [f"[{p.hardware}] {p.model}: {p.verdict}"]
     if p.mode != "impossible":
@@ -330,10 +367,19 @@ def main(argv: list[str] | None = None) -> int:
                     help="mean tokens produced per verify pass (accepted drafts + 1)")
     ap.add_argument("--target-tps", type=float, default=None,
                     help="instead of a plan, print the hardware a model needs for this speed")
+    ap.add_argument("--swarm", type=int, default=None, metavar="N",
+                    help="estimate DeepSeek-V4.1-Flash on N free-runner workers (Colibri cluster)")
+    ap.add_argument("--rtt-ms", type=float, default=40.0, help="coordinator<->worker round trip")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--list", action="store_true", help="list hardware and model presets")
     a = ap.parse_args(argv)
 
+    if a.swarm:
+        e = swarm_estimate(a.swarm, a.rtt_ms)
+        print(json.dumps(e.to_dict(), indent=2) if a.json else
+              f"{e.workers} workers, RTT {e.rtt_ms:.0f} ms: coverage {e.expert_coverage:.0%}, "
+              f"warm ~{e.warm_tok_s} tok/s, first-touch ~{e.cold_s_per_token} s/token ({e.notes})")
+        return 0
     if a.list:
         for h in HARDWARE.values():
             print(f"hw     {h.id:22} {h.vcpus:>3} vCPU {h.ram_gb:>5.0f} GB RAM {h.disk_gb:>6.0f} GB disk  {h.cost}")

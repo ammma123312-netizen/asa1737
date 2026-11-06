@@ -291,6 +291,40 @@ def build_ops(repo: HubRepo, cache: BlockCache, block: int, small_block: int, sm
     return Ops()
 
 
+def safetensors_ranges(repo: HubRepo, include, exclude) -> list[tuple[str, int, int]]:
+    """Byte ranges of tensors whose names match `include` and not `exclude` (regexes)."""
+    import re
+    import struct
+    inc, exc = re.compile(include), re.compile(exclude) if exclude else None
+    out = []
+    for path in sorted(p for p in repo.files if p.endswith(".safetensors")):
+        n = struct.unpack("<Q", repo.read_range(path, 0, 8))[0]
+        header = json.loads(repo.read_range(path, 8, 8 + n))
+        base = 8 + n
+        for name, meta in header.items():
+            if name == "__metadata__" or not inc.search(name) or (exc and exc.search(name)):
+                continue
+            lo, hi = meta["data_offsets"]
+            out.append((path, base + lo, base + hi))
+    return out
+
+
+def warm(repo: HubRepo, cache: BlockCache, block: int, ranges, threads: int = 32) -> int:
+    """Fetch the blocks covering `ranges` into the cache, in parallel. Returns bytes."""
+    blocks = sorted({(p, i) for p, lo, hi in ranges for i in range(lo // block, (hi - 1) // block + 1)})
+    total = 0
+
+    def one(pi):
+        p, i = pi
+        size = repo.files[p]
+        return len(cache.get(p, block, i, lambda: repo.read_range(p, i * block, min((i + 1) * block, size))))
+
+    with ThreadPoolExecutor(threads) as ex:
+        for n in ex.map(one, blocks):
+            total += n
+    return total
+
+
 def make_view(mount: str, view: str) -> int:
     """Writable directory of symlinks into the mount, so engines can write sidecars."""
     n = 0
@@ -318,6 +352,9 @@ def main(argv=None) -> int:
                     help="files read in tiny random pieces (e.g. engram tables)")
     ap.add_argument("--threads", type=int, default=32)
     ap.add_argument("--readahead", type=int, default=8, help="blocks prefetched for sequential readers")
+    ap.add_argument("--warm-include", default=None, metavar="REGEX",
+                    help="prefetch safetensors tensors matching this at mount time")
+    ap.add_argument("--warm-exclude", default=None, metavar="REGEX")
     ap.add_argument("--make-view", nargs=2, metavar=("MOUNT", "VIEW"))
     ap.add_argument("--list", action="store_true", help="print files and sizes, then exit")
     a = ap.parse_args(argv)
@@ -349,6 +386,17 @@ def main(argv=None) -> int:
                   f"fetched={cache.bytes_fetched/1e9:.2f} GB cache={cache.size/1e9:.2f} GB", flush=True)
 
     threading.Thread(target=stats, daemon=True).start()
+
+    if a.warm_include:
+        def do_warm():
+            t = time.time()
+            rs = safetensors_ranges(repo, a.warm_include, a.warm_exclude)
+            want = sum(hi - lo for _, lo, hi in rs)
+            print(f"[hffs] warming {len(rs)} tensors, {want/1e9:.2f} GB", flush=True)
+            got = warm(repo, cache, int(a.block_mb * 2**20), rs, a.threads)
+            print(f"[hffs] warm done: {got/1e9:.2f} GB of blocks in {time.time()-t:.0f}s "
+                  f"({got/max(time.time()-t, 1e-9)/1e6:.0f} MB/s)", flush=True)
+        threading.Thread(target=do_warm, daemon=True).start()
     # kernel_cache: re-reads are served from the page cache without entering Python.
     # max_read: fewer, larger FUSE requests per expert read.
     FUSE(ops, a.mountpoint, foreground=True, nothreads=False, ro=True,
