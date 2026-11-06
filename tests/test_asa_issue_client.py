@@ -130,3 +130,22 @@ def test_cli(monkeypatch, capsys, gh):
     monkeypatch.delenv("ASA_GITHUB_TOKEN")
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     assert ic.main(["get", "7"]) == 1
+
+
+FAILED_COMMENT = ("ASA swarm run failed: https://github.com/o/r/actions/runs/1\n\n"
+                  "---\n_ASA Swarm workflow failed_\n")
+
+
+def test_failed_run_raises_and_rerun_wins(gh):
+    gh.comments[7] = [{"user": BOT, "body": FAILED_COMMENT, "html_url": "f1"}]
+    with pytest.raises(ic.SwarmFailed) as e:
+        client(gh).wait(7, interval=0)
+    assert "actions/runs/1" in str(e.value) and e.value.comment_url == "f1"
+    gh.comments[7].append({"user": BOT, "body": SWARM_COMMENT})
+    assert client(gh).answer(7).text.startswith("The answer is 92.")
+    gh.comments[7].append({"user": BOT, "body": FAILED_COMMENT})
+    with pytest.raises(ic.SwarmFailed):
+        client(gh).answer(7)
+    # A human pasting the failure footer is ignored.
+    gh.comments[8] = [{"user": {"login": "x"}, "body": FAILED_COMMENT}]
+    assert client(gh).answer(8) is None
