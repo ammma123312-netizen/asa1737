@@ -87,6 +87,14 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
              8, 16, 2000, 50, 6.0, "owned",
              "The constraint set from the technical advisor's plan (NVMe 5-7 GB/s).",
              vram_gb=8),
+    Hardware("hf-network-stream", "Free runner/container reading weights from Hugging Face",
+             4, 16, 100000, 15, 0.08, "free",
+             "Measured 2026-11: ~0.5 s per range request, ~0.08 GB/s with 16 parallel "
+             "16 MB reads (the container's egress proxy may be slower than a runner). "
+             "Needs a FUSE mount of the repo; never leaves the free tier, but slow."),
+    Hardware("hetzner-auction-64gb", "Rented dedicated server: 64 GB RAM, 2x1 TB NVMe",
+             8, 64, 1800, 40, 5.0, "~EUR 35-45/month (auction, 2026)",
+             "Two NVMe drives: Colibrì's multidisk report measured GLM-5.2 0.80 -> 1.10 tok/s."),
     Hardware("hf-space-cpu-basic", "Hugging Face Space cpu-basic",
              2, 16, 50, 10, 0.3, "free", "Ephemeral disk; sleeps when idle."),
     Hardware("desktop-nvme-32gb", "Desktop, 32 GB RAM, PCIe4 NVMe",

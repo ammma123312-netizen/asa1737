@@ -293,6 +293,36 @@ Colibrì، وأبقِ الطبقات الكثيفة وذاكرة KV في الـ 
 لم أستطع الوصول إليها، ولم أجد في البحث تأكيداً بأن الشبكة العامة ما زالت تعمل في 2026. الأمر
 `--list` يتحقق من ذلك أولاً. تنبيه مهم: أسئلتك تمرّ عبر خوادم غرباء، فلا ترسل عبرها بيانات خاصة.
 
+## 9. الهدف الأساسي: نموذج 700B بأقل تكلفة
+
+نموذج 30B في الأقسام السابقة كان **اختباراً للأدوات فقط**. الحاوية التي أعمل فيها فيها 30 GB من القرص،
+وأصغر نموذج من فئة 700B يحتاج 131 GB. هذا القسم يجيب عن السؤال الأصلي.
+
+**أصغر نسختين متاحتين من فئة 700B:**
+- **DeepSeek-R1 671B** بتكميم 1.58 بت عبر llama.cpp: 131 GB.
+- **GLM-5.2 744B** بتكميم int4 عبر Colibrì: 429 GB.
+
+| الخيار | التكلفة | DeepSeek 671B | GLM-5.2 744B | الحكم |
+|---|---|---|---|---|
+| مشغّل GitHub مجاني، أو هذه الحاوية، تقرأ الأوزان من Hugging Face عبر الشبكة | **0** | ≈0.026 رمز/ث (≈2 ساعة لكل جواب) | ≈0.005 (≈12 ساعة) | يعمل نظرياً فقط |
+| **خادم مستأجر: 64 GB RAM وقرصا NVMe بسعة 1 TB (مزاد Hetzner)** | **≈35–45 يورو/شهر** | ≈2.6 رمز/ث | ≈0.5–1.1 | **الأفضل قيمة، ويعمل 24/7** |
+| مشغّل GitHub كبير (64 نواة، 256 GB) عند الطلب | ≈0.162 $/دقيقة (≈9.7 $/ساعة) | الأوزان تتسع في الذاكرة، والسرعة عالية | ≈0.5 | جيد لجلسة دفعات، لكنه يعيد التنزيل في كل تشغيل |
+| حاسوبك + قرص NVMe بسعة 2 TB | ≈150–200 $ مرة واحدة | حسب ذاكرة جهازك | ≈0.5–0.8 مع 64 GB | الأرخص على المدى الطويل إن كان جهازك مناسباً |
+
+**قياس الشبكة:** كل قراءة من Hugging Face تستغرق ≈0.5 ثانية، والسرعة ≈0.08 GB/ث مع 16 قراءة متوازية.
+الحساب يؤكد أن تشغيل 700B مجاناً ممكن **تقنياً**، لكن الجواب الواحد يأخذ ساعات. ويتطلب ذلك أيضاً تنزيل
+مئات الجيجابايت من Hugging Face في كل تشغيل.
+
+**التوصية:** خادم مستأجر بقرصين NVMe. عليه:
+1. Colibrì لنموذج GLM-5.2، أو llama.cpp مع `--no-repack` لنموذج DeepSeek.
+2. خادم واجهة OpenAI يتصل به التطبيق عبر LiteLLM.
+3. مشغّل GitHub ذاتي على الخادم نفسه، فتعمل ورشة `asa-colibri` والوسم `asa-ask` عليه دون أي تكلفة إضافية.
+
+```bash
+python -m asa.planner --hardware hetzner-auction-64gb --all-models
+python -m asa.planner --hardware hf-network-stream --model deepseek-r1-1.58bit
+```
+
 ## المصادر
 
 - [Colibrì على GitHub](https://github.com/JustVugg/colibri)
@@ -300,3 +330,7 @@ Colibrì، وأبقِ الطبقات الكثيفة وذاكرة KV في الـ 
 - [GIGAZINE: Colibrì runs GLM-5.2 on 25 GB](https://gigazine.net/gsc_news/en/20260710-colibri-glm/)
 - [AirLLM على GitHub](https://github.com/lyogavin/airllm)
 - [Petals على GitHub](https://github.com/bigscience-workshop/petals)
+- [GitHub larger runners pricing](https://docs.github.com/en/enterprise-cloud@latest/billing/reference/actions-runner-pricing)
+- [CI/CD Calculator: larger runner prices](https://cicdcalculator.com/github-actions-larger-runners-pricing)
+- [Hetzner auction prices (2026 roundup)](https://bestusavps.com/deals/hetzner-deals/)
+- [SSD prices in 2026](https://capitalandcompute.net/ssd-prices/)
