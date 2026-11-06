@@ -1,52 +1,26 @@
-# ASA final routing: one OpenAI-compatible endpoint, full-quality 700B-class model.
+# ASA router — zero cost: no subscriptions, no provider keys, local endpoints only.
 #
-# The model is DeepSeek-V4.1-Flash (763B, MIT, native FP4/FP8 weights). Every tier
-# below except asa-fast serves the SAME weights, so falling back never lowers quality.
+#   asa-deepseek -> DeepSeek-V4.1-Flash 763B (native weights, token-exact) served by Colibri,
+#                   either on one machine reading weights through HFFS, or as the coordinator
+#                   of an ASA swarm (docs/asa/README.md section 12)
+#   asa-fast     -> small local model for instant answers (lower quality, opt-in)
 #
-#   asa-deepseek  -> NVIDIA NIM (free trial credits) -> OpenRouter (~$0.05 in / $0.57 out
-#                    per M tokens, checked 2026-11) -> your own server (Colibri, ~1 tok/s)
-#   asa-private   -> your own server only (prompts never leave your machine)
-#   asa-glm       -> GLM-5.2 via OpenRouter (same idea, for comparison/second opinion)
-#   asa-fast      -> small local model for instant/offline answers (lower quality, opt-in)
+# LITELLM_MASTER_KEY is not a subscription: it is any random string you choose so the proxy
+# is not open to anyone on your network. The app sends it as its API key.
 #
-# Keys (set the ones you have; a tier without a valid key fails over to the next):
-#   LITELLM_MASTER_KEY  any long random string; the app uses it as its API key
-#   NVIDIA_NIM_API_KEY  build.nvidia.com      OPENROUTER_API_KEY  openrouter.ai
-#   ASA_SELFHOST_BASE   e.g. http://10.0.0.5:8000/v1 (scripts/asa/setup_dsv41_server.sh)
-#   COLI_API_KEY        if coli serve was started with --api-key
-#
-# Run:  pip install 'litellm[proxy]' && litellm --config asa/router/litellm.yaml --port 4000
+# Run:  export LITELLM_MASTER_KEY=$(openssl rand -hex 16)
+#       ASA_DEEPSEEK_BASE=http://127.0.0.1:8000/v1 litellm --config asa/router/litellm.yaml --port 4000
 # App:  LLM_HOSTS=localhost:4000
-# Provider model ids change; re-check with: python -m asa.check_providers
 
 model_list:
   - model_name: asa-deepseek
     litellm_params:
-      model: nvidia_nim/deepseek-ai/deepseek-v4.1-flash
-      api_key: os.environ/NVIDIA_NIM_API_KEY
-      timeout: 120
-    model_info: {id: dsv41-nim}
-
-  - model_name: asa-deepseek-openrouter
-    litellm_params:
-      model: openrouter/deepseek/deepseek-v4.1-flash
-      api_key: os.environ/OPENROUTER_API_KEY
-      timeout: 120
-
-  - model_name: asa-private
-    litellm_params:
-      model: openai/deepseek-v4.1-flash
-      api_base: os.environ/ASA_SELFHOST_BASE
-      api_key: os.environ/COLI_API_KEY
-      # Native 763B streamed from NVMe: minutes per long answer.
-      timeout: 3600
-      stream_timeout: 900
-
-  - model_name: asa-glm
-    litellm_params:
-      model: openrouter/z-ai/glm-5.2
-      api_key: os.environ/OPENROUTER_API_KEY
-      timeout: 120
+      model: openai/deepseek-v4.1-flash   # coli serve --model-id deepseek-v4.1-flash
+      api_base: os.environ/ASA_DEEPSEEK_BASE
+      api_key: "none"
+      # Streaming 763B from disk or network: minutes per long answer.
+      timeout: 7200
+      stream_timeout: 1800
 
   - model_name: asa-fast
     litellm_params:
@@ -56,25 +30,18 @@ model_list:
       timeout: 120
 
 router_settings:
-  # Same-weights fallbacks only: quality never drops when a tier is down or rate-limited.
-  fallbacks:
-    - asa-deepseek: [asa-deepseek-openrouter, asa-private]
-    - asa-deepseek-openrouter: [asa-private]
-    - asa-glm: [asa-deepseek]
-  num_retries: 1
+  num_retries: 0
   # Colibri serves one conversation per KV slot; queue rather than overload it.
-  max_parallel_requests: 4
+  max_parallel_requests: 2
 
 general_settings:
-  # Required: recent LiteLLM refuses to start an unauthenticated proxy.
-  # Clients (the app) send it as the API key: Authorization: Bearer $LITELLM_MASTER_KEY
+  # Recent LiteLLM refuses to start an unauthenticated proxy.
   master_key: os.environ/LITELLM_MASTER_KEY
 
 litellm_settings:
   # Exact-match cache only: identical request -> identical stored answer (lossless).
-  # Do not switch to a semantic cache if "no quality loss" matters.
   cache: true
   cache_params:
     type: local
     ttl: 86400
-  request_timeout: 3600
+  request_timeout: 7200
