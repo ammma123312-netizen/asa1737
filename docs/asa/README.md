@@ -107,7 +107,7 @@ python -m asa.planner --hardware workstation-128gb --model glm-5.2 --json
 
 ملف الإعداد: `asa/router/litellm.yaml`. بعد تشغيله يكفي ضبط `LLM_HOSTS=localhost:4000`.
 
-## 4. المشاريع: 29 مشروعاً مفتوح المصدر
+## 4. المشاريع: أول 29 مشروعاً (الكتالوج الكامل: 138 في `asa/projects.yaml`)
 
 القائمة نفسها موجودة بصيغة قابلة للقراءة آلياً في `asa/projects.yaml`، ويتحقق منها الاختبار.
 
@@ -295,6 +295,8 @@ Colibrì، وأبقِ الطبقات الكثيفة وذاكرة KV في الـ 
 
 ## 9. الهدف الأساسي: نموذج 700B بأقل تكلفة
 
+> **محدَّث:** التوصية النهائية في **القسم 11**: DeepSeek-V4.1-Flash بأوزانه الأصلية، مع موجّه بالجودة الكاملة.
+
 نموذج 30B في الأقسام السابقة كان **اختباراً للأدوات فقط**. الحاوية التي أعمل فيها فيها 30 GB من القرص،
 وأصغر نموذج من فئة 700B يحتاج 131 GB. هذا القسم يجيب عن السؤال الأصلي.
 
@@ -324,6 +326,8 @@ python -m asa.planner --hardware hf-network-stream --model deepseek-r1-1.58bit
 ```
 
 ## 10. السرعة الأصلية دون خسارة في الجودة: ما الممكن فعلاً؟
+
+> **محدَّث:** التوصية النهائية في **القسم 11**: DeepSeek-V4.1-Flash بأوزانه الأصلية، مع موجّه بالجودة الكاملة.
 
 ### الجواب الصريح
 "السرعة الأصلية" للنماذج المستضافة، أي 20–60 رمزاً في الثانية، تأتي من عناقيد GPU عرض نطاقها بالتيرابايت
@@ -379,6 +383,71 @@ python -m asa.planner --all-models --target-tps 30   # ماذا يلزم لسر�
 - **السرعة العالية بتكلفة شبه معدومة** ممكنة فقط مع خسارة صغيرة في الجودة (تكميم 4 بت)، أو باستعمال واجهات
   API مجانية تشغّل النماذج الأصلية على خوادمها.
 
+## 11. الطريقة النهائية
+
+### 1) اختيار النموذج: GLM-5.2 أم DeepSeek؟ (أرقام من ملفات Hugging Face نفسها)
+
+| النموذج | المعلمات | الحجم بدقته الأصلية | الترخيص | ما يُقرأ لكل رمز |
+|---|---|---|---|---|
+| GLM-5.2 | 753B | 1.5 TB (BF16) / 756 GB (FP8 رسمي) | MIT | ≈40B نشطة؛ 12.7 GB خبراء حتى بعد تحويله إلى int4 |
+| **DeepSeek-V4.1-Flash** | **763B** | **510 GB (FP4 للخبراء + FP8)، وهي دقته الأصلية** | **MIT** | **4.5 GB خبراء فقط** (+13 KB من جدول engram) |
+| DeepSeek-V4-Pro | 1.65T | 893 GB | MIT | 49B نشطة |
+
+**الفائز: DeepSeek-V4.1-Flash.** هو من فئة 700B، ويُشغَّل بأوزانه الأصلية كما نُشرت، دون أي تحويل
+أو خسارة. Colibrì يقرؤه مباشرة، ونتائجه مطابقة رمزاً برمز. ويقرأ لكل رمز أقل من ثلث ما يقرؤه GLM-5.2.
+على الخادم نفسه يقدّر المخطط أنه **أسرع بأكثر من 4 مرات** من GLM-5.2 FP8 (اختبار
+`test_dsv41_native_beats_glm52_fp8_on_same_cheap_server`). وقد قاس Colibrì سرعة توليد **1.74 رمز/ث**
+على خادم معالج بقرصي NVMe، بالأوزان الأصلية.
+
+### 2) حل مشكلة السرعة والجودة معاً
+الحساب في القسم 10 يثبت أنه لا يوجد عتاد رخيص يعطي سرعة 30 رمز/ث بالجودة الكاملة. لكن **الأوزان نفسها**
+(بترخيص MIT) تُشغَّل لدى مزوّدين بالسرعة الكاملة وبتكلفة شبه معدومة. تحقّقت من ذلك عبر `python -m asa.check_providers`:
+
+| المسار | الجودة | السرعة | التكلفة |
+|---|---|---|---|
+| NVIDIA NIM (`deepseek-ai/deepseek-v4.1-flash`) | كاملة (الأوزان نفسها) | سرعة الخدمة الأصلية | أرصدة تجريبية مجانية |
+| OpenRouter (`deepseek/deepseek-v4.1-flash`) | كاملة | سرعة الخدمة الأصلية | 0.05 $ للمليون رمز مُدخل، 0.57 $ للمليون رمز ناتج |
+| خادمك الخاص (`scripts/asa/setup_dsv41_server.sh`) | كاملة، ومطابقة رمزاً برمز | ≈1–1.7 رمز/ث | ≈40 يورو/شهر |
+
+**مقارنة التكلفة:** الخادم الخاص يُنتج في أقصى حد نحو 2.6 مليون رمز شهرياً بسرعة 1 رمز/ث، مقابل 40 يورو.
+الكمية نفسها عبر OpenRouter تكلّف ≈1.5 دولار، بسرعة أعلى ثلاثين مرة. **لذلك الخادم الخاص طبقة
+للخصوصية والاستقلالية والاحتياط، وليس الطريق الأرخص.**
+
+### 3) Petals والخوادم المجانية: هل يمكن ربطه بالكامل؟
+- **Petals لا يدعم هذا النموذج.** يدعم Llama وMixtral وFalcon وBLOOM فقط. أما DeepSeek-V4.1 فبنيته
+  جديدة (جداول engram، وضاغط KV، وانتباه متناثر)، ونقلها إلى Petals مشروع كبير بحد ذاته.
+- **حتى لو دُعم:** 510 GB تحتاج نحو 34 بطاقة T4 مجانية (15 GB لكل منها)، أي 17 حساب Kaggle تعمل في
+  الوقت نفسه. هذا يخالف شروط Kaggle وColab (حساب واحد لكل شخص، وجلسات محدودة بـ 9–12 ساعة).
+- **دفتر Kaggle واحد يقرأ النموذج من الشبكة:** يقدّر المخطط سرعته بـ ≈0.07 رمز/ث، أي نحو 50 دقيقة لكل جواب.
+- **المكافئ العملي لـ Petals مع هذا النموذج هو وضع cluster في Colibrì:** تُوزَّع الخبراء على أجهزتك
+  (عبر Tailscale إن كانت خلف NAT)، ويقرأ كل جهاز حصته من قرصه بالتوازي.
+- **"الخوادم المجانية" الفعلية لهذا النموذج** هي أرصدة NVIDIA NIM التجريبية، وهي الطبقة الأولى في الموجّه.
+
+### 4) التطبيق: ما الجاهز الآن
+
+```bash
+# 1. موجّه واحد بالجودة الكاملة: NIM ثم OpenRouter ثم خادمك، وكلها بالأوزان نفسها
+export LITELLM_MASTER_KEY=sk-...  NVIDIA_NIM_API_KEY=...  OPENROUTER_API_KEY=...
+litellm --config asa/router/litellm.yaml --port 4000      # في التطبيق: LLM_HOSTS=localhost:4000
+
+# 2. (اختياري) نسختك الخاصة على خادم بذاكرة 64 GB وقرصي NVMe بسعة 1 TB
+MODEL_DIR=/nvme1/dsv41 MIRROR_DIR=/nvme2/dsv41 sudo -E ./scripts/asa/setup_dsv41_server.sh
+export ASA_SELFHOST_BASE=http://SERVER:8000/v1
+
+# 3. التحقق من عدم خسارة الجودة: الأسئلة نفسها على المزوّد وعلى خادمك
+python -m asa.bench_api --port 4000 --model asa-deepseek
+python -m asa.bench_api --port 4000 --model asa-private
+```
+
+**ما جرّبته فعلاً:**
+- **سكربت الخادم:** جرّبته هنا بكل خطواته (البناء، وملف engram، والفحص) ما عدا تنزيل الـ 510 GB.
+- **الموجّه:** جرّبته مع LiteLLM 1.108.1: مفاتيح NIM وOpenRouter غير صالحة، فانتقل تلقائياً إلى خادم
+  وهمي يمثّل خادمك، وأجاب.
+- **ما لم أجرّبه:** التشغيل الكامل لنموذج 763B نفسه، لأنه يحتاج قرصاً بحجم 520 GB.
+
+**المشاريع:** صار الكتالوج يضم 138 مشروعاً، تحققت من وجود كل مستودع منها عبر `git ls-remote`.
+وكل مشروع موسوم بالحقل `quality` (بلا خسارة، أو بخسارة، أو حسب الأوزان).
+
 ## المصادر
 
 - [Colibrì على GitHub](https://github.com/JustVugg/colibri)
@@ -390,3 +459,7 @@ python -m asa.planner --all-models --target-tps 30   # ماذا يلزم لسر�
 - [CI/CD Calculator: larger runner prices](https://cicdcalculator.com/github-actions-larger-runners-pricing)
 - [Hetzner auction prices (2026 roundup)](https://bestusavps.com/deals/hetzner-deals/)
 - [SSD prices in 2026](https://capitalandcompute.net/ssd-prices/)
+- [GLM-5.2 على Hugging Face](https://huggingface.co/zai-org/GLM-5.2) · [GLM-5.2 blog](https://huggingface.co/blog/zai-org/glm-52-blog)
+- [DeepSeek-V4.1-Flash على Hugging Face](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)
+- [Colibrì: DeepSeek V4.1 Flash](https://github.com/JustVugg/colibri/blob/main/docs/deepseek-v41.md)
+- [OpenRouter models API](https://openrouter.ai/api/v1/models) · [NVIDIA NIM models](https://integrate.api.nvidia.com/v1/models)
