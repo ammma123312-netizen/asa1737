@@ -79,9 +79,10 @@ HARDWARE: dict[str, Hardware] = {h.id: h for h in (
              64, 256, 2040, 120, 1.5, "paid (per minute)",
              "Team/Enterprise plans only. Big enough to hold GLM-5.2 on disk."),
     Hardware("ccr-container", "Claude Code cloud container (measured)",
-             4, 15, 30, 15, 0.3, "n/a",
-             "Measured 2026-11: Qwen3-Coder-30B-A3B via Colibrì decodes ~2.0 tok/s "
-             "here (4 vCPU, 15 GB RAM), engine RSS 3.4 GB."),
+             4, 15, 30, 15, 1.5, "n/a",
+             "Measured 2026-11 (disk 1.4-1.8 GB/s with O_DIRECT). Qwen3-Coder-30B-A3B: "
+             "Colibrì int4 ~2.0 tok/s end-to-end; llama.cpp Q4_K_M mmap --no-repack "
+             "~4.4 tok/s end-to-end, 5.3 tok/s decode."),
     Hardware("consultant-8gbvram", "Consultant's box: 8 GB VRAM GPU, 16 GB RAM, PCIe4 NVMe",
              8, 16, 2000, 50, 6.0, "owned",
              "The constraint set from the technical advisor's plan (NVMe 5-7 GB/s).",

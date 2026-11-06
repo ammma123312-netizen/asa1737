@@ -32,11 +32,13 @@ def test_estimate_is_within_2x_of_colibri_published_numbers():
 
 
 def test_estimate_matches_measured_run_in_4cpu_container():
-    # Measured with Colibrì 2.1.0 (commit 0a5504a) on 4 vCPU / 15 GB RAM:
-    # Qwen3-Coder-30B-A3B decoded 1.97-2.16 tok/s end-to-end.
+    # Measured on 4 vCPU / 15 GB RAM / 1.4-1.8 GB/s disk, Qwen3-Coder-30B-A3B:
+    #   Colibrì 2.1.0 int4:                 1.97-2.16 tok/s end-to-end
+    #   llama.cpp 18ab62a Q4_K_M, mmap:     4.3-4.5 tok/s end-to-end, 5.3 decode
+    # The planner is engine-agnostic, so it must land between the two.
     p = plan(HARDWARE["ccr-container"], MODELS["qwen3-coder-30b-a3b"])
     assert p.mode == "expert-streaming"
-    assert 1.0 <= p.est_tokens_per_s <= 4.0, p.est_tokens_per_s
+    assert 2.0 <= p.est_tokens_per_s <= 5.3, p.est_tokens_per_s
 
 
 def test_smoke_model_fits_free_runner_after_disk_cleanup():
