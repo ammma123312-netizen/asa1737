@@ -176,6 +176,8 @@ jobs:
       ASA_ROLE: coordinator
       ASA_API_KEY: ${{ secrets.ASA_API_KEY }}
     steps:
+      - name: Job clock (the task stops in time to upload its results)
+        run: echo "JOB_T0=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
@@ -222,7 +224,12 @@ jobs:
       - name: Run the requested task
         run: |
           python -c "import json;r=json.load(open('request.resolved.json'));open('prompt.txt','w').write(r['prompt']);print(r['ngen'])" > ngen.txt
-          python -m asa.swarm.ask --key "$LOCAL_KEY" --prompt-file prompt.txt --max-tokens "$(cat ngen.txt)" --out result.json | tee answer.txt
+          # job limit 345 min: stop generating 15 min before it so the partial answer is uploaded
+          deadline=$(( 345*60 - 15*60 - ($(date +%s) - JOB_T0) ))
+          thinking=$(python -c "import json;print('--thinking' if json.load(open('request.resolved.json')).get('thinking') else '')")
+          echo "generation deadline: ${deadline}s ${thinking}"
+          python -m asa.swarm.ask --key "$LOCAL_KEY" --prompt-file prompt.txt --max-tokens "$(cat ngen.txt)" \
+            --deadline-s "$deadline" --partial partial.json $thinking --out result.json | tee answer.txt
       - name: Keep the gateway open for the session
         if: env.ASA_API_KEY != ''
         run: |
@@ -236,7 +243,7 @@ jobs:
             echo "workers: ${{ needs.plan.outputs.workers }}"
             echo "### Prompt"; echo '```'; cat prompt.txt 2>/dev/null; echo; echo '```'
             echo "### Answer"; echo '```'; cat answer.txt 2>/dev/null; echo '```'
-            echo "### Timing"; echo '```'; python -c "import json;r=json.load(open('result.json'));r.pop('answer');print(json.dumps(r,indent=1))" 2>/dev/null; echo '```'
+            echo "### Timing"; echo '```'; python -c "import json;r=json.load(open('result.json'));[r.pop(k,None) for k in ('answer','reasoning','tokens')];print(json.dumps(r,indent=1))" 2>/dev/null; echo '```'
             echo "### Engine stats"; echo '```'; grep -v '^\[api\]' engine.err 2>/dev/null | tail -n 25; echo '```'
             echo "### Auth"; echo '```'; tail -n 5 "$ASA_WORK/connect.log" 2>/dev/null; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -267,6 +274,7 @@ jobs:
             prompt.txt
             answer.txt
             result.json
+            partial.json
             engine.err
             rendezvous.log
             ${{ env.ASA_WORK }}/connect.log
