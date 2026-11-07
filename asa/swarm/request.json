@@ -1,9 +1,9 @@
 {
  "prompt": "اكتب دالة بايثون قصيرة تحسب عدد كل حلول مسألة الملكات الثماني (8 ملكات على رقعة 8×8 بحيث لا تهاجم أي ملكة أخرى) باستخدام التراجع (backtracking)، ثم اذكر في النهاية العدد الصحيح للحلول.",
- "ngen": 400,
+ "ngen": 440,
  "workers": 19,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "B: 8-queens (answer 92), 19 workers, experts in RAM, TCP_NODELAY, engram prefetch, overlapped worker round trips, streamed",
+ "stage": "B2: same 8-queens prompt, ngen 440 (B stopped at 400 tokens just before the number); also checks the first 400 tokens repeat exactly",
  "thinking": false
 }
