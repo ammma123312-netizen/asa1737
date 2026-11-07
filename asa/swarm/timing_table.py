@@ -39,6 +39,7 @@ CONNECTED = re.compile(r"\[connect\] authenticated to (\S+)")
 REFUSED = re.compile(r"\[connect\] (\S+) refused us")
 PIPE_CLOSED = re.compile(r"\[pipe\] (connect|guard) (.+?) (->|<-) closed by peer")
 PIPE_ERROR = re.compile(r"\[pipe\] (connect|guard) (.+?) (->|<-) error after")
+ENGINE_WALL = re.compile(r"expert I/O:.*\bwall ([0-9.]+)s")
 LOADED = re.compile(r"loaded in ([0-9.]+)s\b")
 T1 = re.compile(r"DSpark gate:\s*T\(1\)\s*([0-9.]+)\s*ms")
 DSPARK = re.compile(r"DSpark: (\d+) of (\d+) drafts accepted this turn \((\d+) written\)")
@@ -119,10 +120,17 @@ def step_durations(jobs) -> tuple[dict[str, float], dict[str, list[float]]]:
 
 
 # ------------------------------------------------------------------ metrics
+NON_TEXT_KINDS = {"meta", "stop", "done", "error", "usage", "role"}
+
+
 def token_stats(result: dict) -> dict:
-    toks = [x for x in result.get("tokens") or [] if isinstance(x, dict) and "t" in x]
+    """result.json (or partial.json) of ask.py: stage B adds tokens [{t, kind, text}],
+    "stopped" and "finish_reason"; older runs only have wall_s and completion_tokens."""
+    toks = [x for x in result.get("tokens") or []
+            if isinstance(x, dict) and "t" in x and x.get("kind") not in NON_TEXT_KINDS]
     out = {"source": None, "first_s": None, "gap_p50": None, "gap_p90": None, "s_per_token": None,
-           "n": len(toks)}
+           "n": len(toks), "stopped": result.get("stopped"),
+           "finish_reason": result.get("finish_reason")}
     if len(toks) >= 1:
         ts = [float(x["t"]) for x in toks]
         gaps = [b - a for a, b in zip(ts, ts[1:])]
@@ -191,10 +199,15 @@ def _f(v, nd=1):
 def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
     files = find_files(run_dir)
     pick = lambda n: (files.get(n) or [None])[0]  # noqa: E731
-    try:
-        result = json.loads(read(pick("result.json")) or "{}")
-    except json.JSONDecodeError:
-        result = {}
+    def load_json(name):
+        try:
+            return json.loads(read(pick(name)) or "{}")
+        except json.JSONDecodeError:
+            return {}
+
+    result, partial = load_json("result.json"), load_json("partial.json")
+    # A run that was stopped or failed may only have the partial stream.
+    timing_src = result if result.get("tokens") or not partial.get("tokens") else partial
     engine, connect_text = read(pick("engine.err")), read(pick("connect.log"))
     rdv_text = read(pick("rendezvous.log"))
     rdv = rendezvous_map(rdv_text)
@@ -224,7 +237,9 @@ def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
     L.append("")
 
     # (b) seconds per token
-    ts = token_stats(result)
+    ts = token_stats(timing_src)
+    if timing_src is partial:
+        ts["source"] = f"partial.json {ts['source']}"
     data["tokens"] = ts
     L += ["## (ب) الثواني لكل رمز · Seconds per token", "",
           "| المقياس · metric | القيمة · value |", "|---|---|",
@@ -232,7 +247,10 @@ def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
           f"| الفاصل الوسيط بين الرموز · median inter-token gap (s) | {_f(ts['gap_p50'])} |",
           f"| الفاصل p90 · p90 inter-token gap (s) | {_f(ts['gap_p90'])} |",
           f"| المتوسط الكلي · overall s/token | {_f(ts['s_per_token'])} |",
-          f"| المصدر · source | {ts['source'] or '–'} ({ts['n']} tokens) |", ""]
+          f"| المصدر · source | {ts['source'] or '–'} ({ts['n']} tokens) |"]
+    if ts["stopped"] is not None or ts["finish_reason"]:
+        L.append(f"| التوقف · stopped / finish_reason | {ts['stopped']} / {ts['finish_reason'] or '–'} |")
+    L.append("")
 
     # (c) compute vs network
     rows, tot_g, tot_c = [], 0.0, 0.0
@@ -263,9 +281,28 @@ def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
                  f"{_f(r['guard_s'])} / {_f(r['guard_n'])} | {_f(r['connect_s'])} / {_f(r['connect_n'])} | "
                  f"{_f(r['network_s'])} |")
     T = data["totals"]
-    L.append(f"| **المجموع · total** | | | **{_f(T['guard_s'])}** | **{_f(T['connect_s'])}** | "
+    paired = sum(1 for r in rows if r["network_s"] is not None)
+    # Every worker's connect time, guard.log or not: before the parallel-batch patch the
+    # coordinator waited on workers one after another, so this sum is the serial wait.
+    conn_all = [r for r in rows if r["connect_s"] is not None]
+    data["connect_all_s"] = round(sum(r["connect_s"] for r in conn_all), 1)
+    L.append(f"| **مجموع الانتظار لكل العمال · connect total, all workers ({len(conn_all)})** | | | "
+             f"| **{_f(data['connect_all_s'])}** | |")
+    L.append(f"| **المجموع للعمال ذوي القياسين · total, workers with both guard and connect "
+             f"({paired})** | | | **{_f(T['guard_s'])}** | **{_f(T['connect_s'])}** | "
              f"**{_f(T['network_s'])}** |")
-    if fw:
+    if conn_all:
+        slow = max(conn_all, key=lambda r: r["connect_s"])
+        data["slowest_worker"] = {k: slow[k] for k in ("worker", "addr", "connect_s", "guard_s", "network_s")}
+        L.append(f"\n- أبطأ عامل · slowest worker: **{slow['worker']}** ({slow['addr']}), connect "
+                 f"**{_f(slow['connect_s'])} s**, guard {_f(slow['guard_s'])} s, network "
+                 f"{_f(slow['network_s'])} s. When the coordinator overlaps its requests to all workers "
+                 f"(parallel-batch patch), each layer waits roughly for the slowest worker, not the sum.")
+    have_pairs = any(r["network_s"] is not None for r in rows)
+    if not have_pairs:
+        L.append("\n- لا توجد سجلات guard/connect مقترنة · no paired guard/connect logs found: "
+                 "compute vs network not available")
+    if fw and have_pairs:
         per = lambda s: round(1000 * s / (fw * layers), 1)  # noqa: E731
         data["per_layer_ms"] = {"guard": per(tot_g), "connect": per(tot_c), "network": per(tot_c - tot_g)}
         P = data["per_layer_ms"]
@@ -274,7 +311,15 @@ def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
               f"- الحساب · compute **{P['guard']} ms**, الانتظار · wait **{P['connect']} ms**, "
               f"الشبكة · network **{P['network']} ms**"]
     if data["t1_ms"]:
-        L.append(f"- T(1) من سطر DSpark · from the DSpark gate line: **{data['t1_ms'] / 1000:.1f} s** per forward")
+        L.append(f"- T(1) من سطر DSpark · from the DSpark gate line: **{data['t1_ms'] / 1000:.1f} s** "
+                 f"for one single-row forward")
+        ew = ENGINE_WALL.findall(engine)
+        wall, wsrc = (float(ew[-1]), "engine wall") if ew else ((timing_src or {}).get("wall_s"), "wall_s")
+        if wall:
+            data["t1_equivalent_forwards"] = round(wall / (data["t1_ms"] / 1000), 1)
+            L.append(f"- مكافئ التمريرات · {wsrc} {wall:.1f} s / T(1) = **{data['t1_equivalent_forwards']}** "
+                     f"single-row passes (a batched verify pass costs more than T(1), so this can "
+                     f"exceed the forward count)")
     L += ["", "> هذا متوسط محسوب من المجاميع، وليس قياساً لكل طبقة. "
               "This is an average derived from totals, not a per-layer measurement.", ""]
 
