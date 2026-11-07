@@ -1,0 +1,2 @@
+  [CLUSTER] expert worker · 127.0.0.1:9100 · layers all
+[CLUSTER] expert worker listening on 0.0.0.0:9100 (disk-backed, cache=1/layer, 40 layers x 384 experts)
