@@ -122,12 +122,17 @@ jobs:
           k=$(( ${{ matrix.i }} - 1 )); n=${{ needs.plan.outputs.workers }}
           # tmpfs pages count against the runner's memory: keep ~3 GB for the OS, the
           # worker process and the page cache of any shards that overflow to disk.
+          # Free memory held by services the swarm never uses.
+          sudo systemctl stop docker.socket docker containerd snapd multipathd unattended-upgrades 2>/dev/null || true
           avail=$(awk '/MemAvailable/ {printf "%d", $2/1048576}' /proc/meminfo)
           budget=$(( avail > 5 ? avail - 3 : 1 ))
-          sudo mount -o remount,size=$(( budget + 1 ))G /dev/shm
-          mkdir -p /dev/shm/asa
-          echo "RAM budget ${budget} GB of ${avail} GB available" | tee -a "$GITHUB_STEP_SUMMARY"
-          ASA_STAGE="--owner $k/$n --ram-dir /dev/shm/asa --ram-budget-gb $budget" ./asa/swarm/node_setup.sh
+          # A8 failed with EDQUOT ("Disk quota exceeded"), not ENOSPC: the runner's /dev/shm
+          # carries a quota, so resizing it does not help. Our own tmpfs has no quota.
+          sudo mkdir -p /mnt/asa-ram
+          sudo mount -t tmpfs -o size=$(( budget + 1 ))G,mode=1777 asa-ram /mnt/asa-ram
+          mkdir -p /mnt/asa-ram/asa
+          echo "RAM budget ${budget} GB of ${avail} GB available (own tmpfs)" | tee -a "$GITHUB_STEP_SUMMARY"
+          ASA_STAGE="--owner $k/$n --ram-dir /mnt/asa-ram/asa --ram-budget-gb $budget" ./asa/swarm/node_setup.sh
           grep "\[stage\] ram" "$HOME/asa-swarm/stage.log" | tee -a "$GITHUB_STEP_SUMMARY" || true
           tail -1 "$HOME/asa-swarm/stage.log" | tee -a "$GITHUB_STEP_SUMMARY"
           df -h / | tail -1
@@ -180,6 +185,7 @@ jobs:
         run: python -m asa.swarm.preflight
       - name: Node setup (dense + draft head staged locally; engram via HFFS)
         run: |
+          sudo systemctl stop docker.socket docker containerd snapd multipathd unattended-upgrades 2>/dev/null || true
           export ASA_MOUNT=1 CACHE_GB=10
           export ASA_STAGE="--include . --exclude ^layers\.[0-9]+\.ffn\.experts\.|engram --link-from $HOME/asa-swarm/mnt --link *-0004[78]-of-*"
           ./asa/swarm/node_setup.sh

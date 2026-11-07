@@ -1,8 +1,8 @@
 {
  "prompt": "ما هي عاصمة المملكة العربية السعودية؟",
  "ngen": 8,
- "workers": 4,
+ "workers": 19,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A8: 4 workers, experts in RAM (tmpfs) + TCP_NODELAY + direct-route probe + per-layer timing"
+ "stage": "A9: 19 workers, experts in own tmpfs (A8 EDQUOT fix) + TCP_NODELAY + direct routes + timing"
 }
