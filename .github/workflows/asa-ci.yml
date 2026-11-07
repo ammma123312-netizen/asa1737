@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pytest pytest-asyncio pyyaml requests "PyJWT[crypto]"
-      - run: python -m pytest tests/test_asa_planner.py tests/test_asa_swarm.py tests/test_asa_router.py tests/test_asa_router_auto.py tests/test_asa_issue_client.py tests/test_asa_swarm_bridge.py tests/test_asa_self_hosted_runner.py tests/test_asa_swarm_report.py tests/test_asa_patch_colibri.py tests/test_asa_stage_ram.py tests/test_asa_compress_probe.py tests/test_asa_patch_colibri_engram.py tests/test_asa_ask.py -q
+      - run: python -m pytest tests/test_asa_planner.py tests/test_asa_swarm.py tests/test_asa_router.py tests/test_asa_router_auto.py tests/test_asa_issue_client.py tests/test_asa_swarm_bridge.py tests/test_asa_self_hosted_runner.py tests/test_asa_swarm_report.py tests/test_asa_patch_colibri.py tests/test_asa_stage_ram.py tests/test_asa_compress_probe.py tests/test_asa_patch_colibri_engram.py tests/test_asa_ask.py tests/test_asa_patch_colibri_parallel.py tests/test_asa_timing_table.py -q
       - name: Feasibility table for this runner
         run: |
           {

@@ -4,6 +4,6 @@
  "workers": 19,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "B: 8-queens (answer 92), 19 workers, experts in RAM, TCP_NODELAY, engram prefetch, streamed with per-token timestamps",
+ "stage": "B: 8-queens (answer 92), 19 workers, experts in RAM, TCP_NODELAY, engram prefetch, overlapped worker round trips, streamed",
  "thinking": false
 }
