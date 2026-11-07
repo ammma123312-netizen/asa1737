@@ -1,0 +1,2013 @@
+{
+ "answer": "# حل مسألة الملكات الثماني باستخدام التراجع\n\n```python\ndef count_queens(n=8):\n    count = 0\n    cols = set()          # الأعمدة المستخدمة\n    diag1 = set()         # القطر الرئيسي (row - col)\n    diag2 = set()         # القطر الثانوي (row + col)\n\n    def backtrack(row):\n        nonlocal count\n        if row == n:\n            count += 1\n            return\n        for col in range(n):\n            if col in cols or (row - col) in diag1 or (row + col) in diag2:\n                continue\n            cols.add(col); diag1.add(row - col); diag2.add(row + col)\n            backtrack(row + 1)\n            cols.remove(col); diag1.remove(row - col); diag2.remove(row + col)\n\n    backtrack(0)\n    return count\n\nprint(count_queens(8))\n```\n\n## شرح مختصر\n\n- **التراجع (Backtracking):** نضع ملكة في كل صف على التوالي، ونجرب كل عمود ممكن.\n- **مجموعات التحقق السريع:** نستخدم ثلاث مجموعات (`set`) لتتبع الأعمدة والقطرين، مما يجعل التحقق من صحة الوضعية بزمن ثابت O(1).\n- **القطران:**\n  - القطر الرئيسي: كل خلية عليه تحقق `row - col = ثابت`.\n  - القطر الثانوي: كل خلية عليه تحقق `row + col = ثابت`.\n- عند الوصول إلى الصف الثامن (`row == n`) نكون قد وجدنا حلًا صحيحًا، فنزيد العدّاد.\n\n## النتيجة\n\nعدد الحلول الصحيحة لمسألة الملكات الثمان",
+ "reasoning": "",
+ "wall_s": 6950.5,
+ "completion_tokens": 400,
+ "prompt_tokens": 75,
+ "tok_per_s_end_to_end": 0.058,
+ "finish_reason": "length",
+ "stopped": null,
+ "tokens": [
+  {
+   "t": 202.05,
+   "kind": "content",
+   "text": "#"
+  },
+  {
+   "t": 220.22,
+   "kind": "content",
+   "text": " حل"
+  },
+  {
+   "t": 238.71,
+   "kind": "content",
+   "text": " مس"
+  },
+  {
+   "t": 263.4,
+   "kind": "content",
+   "text": "أ"
+  },
+  {
+   "t": 263.4,
+   "kind": "content",
+   "text": "لة"
+  },
+  {
+   "t": 263.4,
+   "kind": "content",
+   "text": " الملك"
+  },
+  {
+   "t": 279.3,
+   "kind": "content",
+   "text": "ات"
+  },
+  {
+   "t": 295.52,
+   "kind": "content",
+   "text": " الث"
+  },
+  {
+   "t": 311.68,
+   "kind": "content",
+   "text": "مان"
+  },
+  {
+   "t": 327.45,
+   "kind": "content",
+   "text": "ي"
+  },
+  {
+   "t": 343.52,
+   "kind": "content",
+   "text": " باست"
+  },
+  {
+   "t": 362.64,
+   "kind": "content",
+   "text": "خدام"
+  },
+  {
+   "t": 380.89,
+   "kind": "content",
+   "text": " التر"
+  },
+  {
+   "t": 397.8,
+   "kind": "content",
+   "text": "اجع"
+  },
+  {
+   "t": 413.96,
+   "kind": "content",
+   "text": "\n\n"
+  },
+  {
+   "t": 430.86,
+   "kind": "content",
+   "text": "```"
+  },
+  {
+   "t": 447.15,
+   "kind": "content",
+   "text": "python"
+  },
+  {
+   "t": 464.46,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 481.71,
+   "kind": "content",
+   "text": "def"
+  },
+  {
+   "t": 498.63,
+   "kind": "content",
+   "text": " count"
+  },
+  {
+   "t": 515.37,
+   "kind": "content",
+   "text": "_"
+  },
+  {
+   "t": 532.05,
+   "kind": "content",
+   "text": "que"
+  },
+  {
+   "t": 548.29,
+   "kind": "content",
+   "text": "ens"
+  },
+  {
+   "t": 565.43,
+   "kind": "content",
+   "text": "(n"
+  },
+  {
+   "t": 582.15,
+   "kind": "content",
+   "text": "="
+  },
+  {
+   "t": 599.31,
+   "kind": "content",
+   "text": "8"
+  },
+  {
+   "t": 616.39,
+   "kind": "content",
+   "text": "):\n"
+  },
+  {
+   "t": 632.7,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 650.45,
+   "kind": "content",
+   "text": " count"
+  },
+  {
+   "t": 669.37,
+   "kind": "content",
+   "text": " ="
+  },
+  {
+   "t": 686.63,
+   "kind": "content",
+   "text": " "
+  },
+  {
+   "t": 703.48,
+   "kind": "content",
+   "text": "0"
+  },
+  {
+   "t": 720.49,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 736.97,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 753.5,
+   "kind": "content",
+   "text": " cols"
+  },
+  {
+   "t": 770.14,
+   "kind": "content",
+   "text": " ="
+  },
+  {
+   "t": 786.78,
+   "kind": "content",
+   "text": " set"
+  },
+  {
+   "t": 803.88,
+   "kind": "content",
+   "text": "()"
+  },
+  {
+   "t": 821.22,
+   "kind": "content",
+   "text": "         "
+  },
+  {
+   "t": 838.72,
+   "kind": "content",
+   "text": " #"
+  },
+  {
+   "t": 855.4,
+   "kind": "content",
+   "text": " الأ"
+  },
+  {
+   "t": 871.74,
+   "kind": "content",
+   "text": "عم"
+  },
+  {
+   "t": 888.42,
+   "kind": "content",
+   "text": "دة"
+  },
+  {
+   "t": 905.21,
+   "kind": "content",
+   "text": " المست"
+  },
+  {
+   "t": 922.97,
+   "kind": "content",
+   "text": "خدم"
+  },
+  {
+   "t": 939.81,
+   "kind": "content",
+   "text": "ة"
+  },
+  {
+   "t": 957.95,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 976.68,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 996.99,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 1014.57,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 1030.92,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 1047.44,
+   "kind": "content",
+   "text": " ="
+  },
+  {
+   "t": 1064.34,
+   "kind": "content",
+   "text": " set"
+  },
+  {
+   "t": 1080.9,
+   "kind": "content",
+   "text": "()"
+  },
+  {
+   "t": 1097.0,
+   "kind": "content",
+   "text": "        "
+  },
+  {
+   "t": 1112.96,
+   "kind": "content",
+   "text": " #"
+  },
+  {
+   "t": 1129.17,
+   "kind": "content",
+   "text": " الق"
+  },
+  {
+   "t": 1146.13,
+   "kind": "content",
+   "text": "طر"
+  },
+  {
+   "t": 1162.99,
+   "kind": "content",
+   "text": " الرئيس"
+  },
+  {
+   "t": 1179.57,
+   "kind": "content",
+   "text": "ي"
+  },
+  {
+   "t": 1197.0,
+   "kind": "content",
+   "text": " ("
+  },
+  {
+   "t": 1214.43,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 1230.81,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 1247.12,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 1268.02,
+   "kind": "content",
+   "text": ")\n"
+  },
+  {
+   "t": 1285.81,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 1303.41,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 1320.43,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 1336.6,
+   "kind": "content",
+   "text": "2"
+  },
+  {
+   "t": 1353.54,
+   "kind": "content",
+   "text": " ="
+  },
+  {
+   "t": 1370.09,
+   "kind": "content",
+   "text": " set"
+  },
+  {
+   "t": 1394.69,
+   "kind": "content",
+   "text": "()"
+  },
+  {
+   "t": 1420.58,
+   "kind": "content",
+   "text": "        "
+  },
+  {
+   "t": 1420.58,
+   "kind": "content",
+   "text": " #"
+  },
+  {
+   "t": 1420.58,
+   "kind": "content",
+   "text": " الق"
+  },
+  {
+   "t": 1437.18,
+   "kind": "content",
+   "text": "طر"
+  },
+  {
+   "t": 1453.78,
+   "kind": "content",
+   "text": " الث"
+  },
+  {
+   "t": 1470.65,
+   "kind": "content",
+   "text": "ان"
+  },
+  {
+   "t": 1487.11,
+   "kind": "content",
+   "text": "وي"
+  },
+  {
+   "t": 1503.98,
+   "kind": "content",
+   "text": " ("
+  },
+  {
+   "t": 1520.75,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 1537.54,
+   "kind": "content",
+   "text": " +"
+  },
+  {
+   "t": 1554.42,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 1572.46,
+   "kind": "content",
+   "text": ")\n\n"
+  },
+  {
+   "t": 1589.5,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 1606.45,
+   "kind": "content",
+   "text": " def"
+  },
+  {
+   "t": 1623.68,
+   "kind": "content",
+   "text": " backtrack"
+  },
+  {
+   "t": 1640.86,
+   "kind": "content",
+   "text": "(row"
+  },
+  {
+   "t": 1657.86,
+   "kind": "content",
+   "text": "):\n"
+  },
+  {
+   "t": 1674.32,
+   "kind": "content",
+   "text": "       "
+  },
+  {
+   "t": 1690.78,
+   "kind": "content",
+   "text": " non"
+  },
+  {
+   "t": 1707.55,
+   "kind": "content",
+   "text": "local"
+  },
+  {
+   "t": 1724.52,
+   "kind": "content",
+   "text": " count"
+  },
+  {
+   "t": 1742.56,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 1759.66,
+   "kind": "content",
+   "text": "       "
+  },
+  {
+   "t": 1777.22,
+   "kind": "content",
+   "text": " if"
+  },
+  {
+   "t": 1795.56,
+   "kind": "content",
+   "text": " row"
+  },
+  {
+   "t": 1812.9,
+   "kind": "content",
+   "text": " =="
+  },
+  {
+   "t": 1830.05,
+   "kind": "content",
+   "text": " n"
+  },
+  {
+   "t": 1854.42,
+   "kind": "content",
+   "text": ":\n"
+  },
+  {
+   "t": 1872.06,
+   "kind": "content",
+   "text": "           "
+  },
+  {
+   "t": 1893.66,
+   "kind": "content",
+   "text": " count"
+  },
+  {
+   "t": 1910.45,
+   "kind": "content",
+   "text": " +="
+  },
+  {
+   "t": 1927.06,
+   "kind": "content",
+   "text": " "
+  },
+  {
+   "t": 1943.79,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 1960.71,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 1977.69,
+   "kind": "content",
+   "text": "           "
+  },
+  {
+   "t": 1993.81,
+   "kind": "content",
+   "text": " return"
+  },
+  {
+   "t": 2011.04,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 2027.89,
+   "kind": "content",
+   "text": "       "
+  },
+  {
+   "t": 2044.66,
+   "kind": "content",
+   "text": " for"
+  },
+  {
+   "t": 2061.91,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 2078.3,
+   "kind": "content",
+   "text": " in"
+  },
+  {
+   "t": 2095.39,
+   "kind": "content",
+   "text": " range"
+  },
+  {
+   "t": 2112.44,
+   "kind": "content",
+   "text": "(n"
+  },
+  {
+   "t": 2129.39,
+   "kind": "content",
+   "text": "):\n"
+  },
+  {
+   "t": 2146.21,
+   "kind": "content",
+   "text": "           "
+  },
+  {
+   "t": 2163.87,
+   "kind": "content",
+   "text": " if"
+  },
+  {
+   "t": 2181.13,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 2198.42,
+   "kind": "content",
+   "text": " in"
+  },
+  {
+   "t": 2215.61,
+   "kind": "content",
+   "text": " cols"
+  },
+  {
+   "t": 2232.65,
+   "kind": "content",
+   "text": " or"
+  },
+  {
+   "t": 2249.56,
+   "kind": "content",
+   "text": " ("
+  },
+  {
+   "t": 2267.34,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 2284.09,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 2300.48,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 2316.43,
+   "kind": "content",
+   "text": ")"
+  },
+  {
+   "t": 2332.85,
+   "kind": "content",
+   "text": " in"
+  },
+  {
+   "t": 2350.75,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 2367.94,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 2384.12,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 2401.28,
+   "kind": "content",
+   "text": " or"
+  },
+  {
+   "t": 2418.12,
+   "kind": "content",
+   "text": " ("
+  },
+  {
+   "t": 2434.22,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 2451.03,
+   "kind": "content",
+   "text": " +"
+  },
+  {
+   "t": 2471.19,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 2487.81,
+   "kind": "content",
+   "text": ")"
+  },
+  {
+   "t": 2504.14,
+   "kind": "content",
+   "text": " in"
+  },
+  {
+   "t": 2520.9,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 2537.85,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 2562.59,
+   "kind": "content",
+   "text": "2"
+  },
+  {
+   "t": 2562.59,
+   "kind": "content",
+   "text": ":\n"
+  },
+  {
+   "t": 2588.9,
+   "kind": "content",
+   "text": "               "
+  },
+  {
+   "t": 2604.88,
+   "kind": "content",
+   "text": " continue"
+  },
+  {
+   "t": 2622.24,
+   "kind": "content",
+   "text": "\n"
+  },
+  {
+   "t": 2638.8,
+   "kind": "content",
+   "text": "           "
+  },
+  {
+   "t": 2654.93,
+   "kind": "content",
+   "text": " cols"
+  },
+  {
+   "t": 2671.5,
+   "kind": "content",
+   "text": ".add"
+  },
+  {
+   "t": 2688.3,
+   "kind": "content",
+   "text": "(col"
+  },
+  {
+   "t": 2705.48,
+   "kind": "content",
+   "text": ");"
+  },
+  {
+   "t": 2722.91,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 2740.07,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 2756.99,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 2774.42,
+   "kind": "content",
+   "text": ".add"
+  },
+  {
+   "t": 2791.84,
+   "kind": "content",
+   "text": "(row"
+  },
+  {
+   "t": 2808.74,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 2826.11,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 2843.81,
+   "kind": "content",
+   "text": ");"
+  },
+  {
+   "t": 2860.35,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 2877.05,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 2893.5,
+   "kind": "content",
+   "text": "2"
+  },
+  {
+   "t": 2909.83,
+   "kind": "content",
+   "text": ".add"
+  },
+  {
+   "t": 2926.99,
+   "kind": "content",
+   "text": "(row"
+  },
+  {
+   "t": 2943.62,
+   "kind": "content",
+   "text": " +"
+  },
+  {
+   "t": 2960.3,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 2976.58,
+   "kind": "content",
+   "text": ")\n"
+  },
+  {
+   "t": 2992.72,
+   "kind": "content",
+   "text": "           "
+  },
+  {
+   "t": 3009.17,
+   "kind": "content",
+   "text": " backtrack"
+  },
+  {
+   "t": 3025.95,
+   "kind": "content",
+   "text": "(row"
+  },
+  {
+   "t": 3042.05,
+   "kind": "content",
+   "text": " +"
+  },
+  {
+   "t": 3059.82,
+   "kind": "content",
+   "text": " "
+  },
+  {
+   "t": 3077.35,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 3094.25,
+   "kind": "content",
+   "text": ")\n"
+  },
+  {
+   "t": 3111.79,
+   "kind": "content",
+   "text": "           "
+  },
+  {
+   "t": 3128.53,
+   "kind": "content",
+   "text": " cols"
+  },
+  {
+   "t": 3145.01,
+   "kind": "content",
+   "text": ".remove"
+  },
+  {
+   "t": 3162.8,
+   "kind": "content",
+   "text": "(col"
+  },
+  {
+   "t": 3180.38,
+   "kind": "content",
+   "text": ");"
+  },
+  {
+   "t": 3197.69,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 3213.82,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 3229.89,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 3246.57,
+   "kind": "content",
+   "text": ".remove"
+  },
+  {
+   "t": 3263.69,
+   "kind": "content",
+   "text": "(row"
+  },
+  {
+   "t": 3281.11,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 3297.9,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 3313.96,
+   "kind": "content",
+   "text": ");"
+  },
+  {
+   "t": 3329.75,
+   "kind": "content",
+   "text": " di"
+  },
+  {
+   "t": 3345.93,
+   "kind": "content",
+   "text": "ag"
+  },
+  {
+   "t": 3362.61,
+   "kind": "content",
+   "text": "2"
+  },
+  {
+   "t": 3379.73,
+   "kind": "content",
+   "text": ".remove"
+  },
+  {
+   "t": 3396.4,
+   "kind": "content",
+   "text": "(row"
+  },
+  {
+   "t": 3412.95,
+   "kind": "content",
+   "text": " +"
+  },
+  {
+   "t": 3429.69,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 3446.57,
+   "kind": "content",
+   "text": ")\n\n"
+  },
+  {
+   "t": 3463.14,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 3479.89,
+   "kind": "content",
+   "text": " backtrack"
+  },
+  {
+   "t": 3495.81,
+   "kind": "content",
+   "text": "("
+  },
+  {
+   "t": 3511.86,
+   "kind": "content",
+   "text": "0"
+  },
+  {
+   "t": 3528.78,
+   "kind": "content",
+   "text": ")\n"
+  },
+  {
+   "t": 3545.6,
+   "kind": "content",
+   "text": "   "
+  },
+  {
+   "t": 3562.16,
+   "kind": "content",
+   "text": " return"
+  },
+  {
+   "t": 3578.2,
+   "kind": "content",
+   "text": " count"
+  },
+  {
+   "t": 3594.45,
+   "kind": "content",
+   "text": "\n\n"
+  },
+  {
+   "t": 3610.76,
+   "kind": "content",
+   "text": "print"
+  },
+  {
+   "t": 3627.3,
+   "kind": "content",
+   "text": "(count"
+  },
+  {
+   "t": 3644.5,
+   "kind": "content",
+   "text": "_"
+  },
+  {
+   "t": 3662.07,
+   "kind": "content",
+   "text": "que"
+  },
+  {
+   "t": 3678.92,
+   "kind": "content",
+   "text": "ens"
+  },
+  {
+   "t": 3709.38,
+   "kind": "content",
+   "text": "("
+  },
+  {
+   "t": 3734.22,
+   "kind": "content",
+   "text": "8"
+  },
+  {
+   "t": 3750.25,
+   "kind": "content",
+   "text": "))\n"
+  },
+  {
+   "t": 3766.74,
+   "kind": "content",
+   "text": "```\n\n"
+  },
+  {
+   "t": 3783.32,
+   "kind": "content",
+   "text": "##"
+  },
+  {
+   "t": 3799.9,
+   "kind": "content",
+   "text": " شرح"
+  },
+  {
+   "t": 3817.05,
+   "kind": "content",
+   "text": " مخت"
+  },
+  {
+   "t": 3834.08,
+   "kind": "content",
+   "text": "صر"
+  },
+  {
+   "t": 3850.98,
+   "kind": "content",
+   "text": "\n\n"
+  },
+  {
+   "t": 3868.03,
+   "kind": "content",
+   "text": "-"
+  },
+  {
+   "t": 3884.9,
+   "kind": "content",
+   "text": " **"
+  },
+  {
+   "t": 3901.26,
+   "kind": "content",
+   "text": "ال"
+  },
+  {
+   "t": 3917.97,
+   "kind": "content",
+   "text": "تر"
+  },
+  {
+   "t": 3934.76,
+   "kind": "content",
+   "text": "اجع"
+  },
+  {
+   "t": 3951.15,
+   "kind": "content",
+   "text": " ("
+  },
+  {
+   "t": 3969.17,
+   "kind": "content",
+   "text": "Back"
+  },
+  {
+   "t": 3985.79,
+   "kind": "content",
+   "text": "track"
+  },
+  {
+   "t": 4002.13,
+   "kind": "content",
+   "text": "ing"
+  },
+  {
+   "t": 4019.95,
+   "kind": "content",
+   "text": "):"
+  },
+  {
+   "t": 4036.81,
+   "kind": "content",
+   "text": "**"
+  },
+  {
+   "t": 4053.12,
+   "kind": "content",
+   "text": " ن"
+  },
+  {
+   "t": 4070.17,
+   "kind": "content",
+   "text": "ضع"
+  },
+  {
+   "t": 4086.65,
+   "kind": "content",
+   "text": " م"
+  },
+  {
+   "t": 4103.32,
+   "kind": "content",
+   "text": "لك"
+  },
+  {
+   "t": 4119.44,
+   "kind": "content",
+   "text": "ة"
+  },
+  {
+   "t": 4135.73,
+   "kind": "content",
+   "text": " في"
+  },
+  {
+   "t": 4152.53,
+   "kind": "content",
+   "text": " كل"
+  },
+  {
+   "t": 4169.34,
+   "kind": "content",
+   "text": " ص"
+  },
+  {
+   "t": 4186.39,
+   "kind": "content",
+   "text": "ف"
+  },
+  {
+   "t": 4202.92,
+   "kind": "content",
+   "text": " على"
+  },
+  {
+   "t": 4220.24,
+   "kind": "content",
+   "text": " التو"
+  },
+  {
+   "t": 4236.64,
+   "kind": "content",
+   "text": "الي"
+  },
+  {
+   "t": 4253.44,
+   "kind": "content",
+   "text": "،"
+  },
+  {
+   "t": 4271.13,
+   "kind": "content",
+   "text": " و"
+  },
+  {
+   "t": 4288.96,
+   "kind": "content",
+   "text": "نج"
+  },
+  {
+   "t": 4306.87,
+   "kind": "content",
+   "text": "رب"
+  },
+  {
+   "t": 4324.32,
+   "kind": "content",
+   "text": " كل"
+  },
+  {
+   "t": 4341.27,
+   "kind": "content",
+   "text": " عم"
+  },
+  {
+   "t": 4357.51,
+   "kind": "content",
+   "text": "ود"
+  },
+  {
+   "t": 4373.8,
+   "kind": "content",
+   "text": " ممكن"
+  },
+  {
+   "t": 4390.45,
+   "kind": "content",
+   "text": ".\n"
+  },
+  {
+   "t": 4407.03,
+   "kind": "content",
+   "text": "-"
+  },
+  {
+   "t": 4423.54,
+   "kind": "content",
+   "text": " **"
+  },
+  {
+   "t": 4440.11,
+   "kind": "content",
+   "text": "مج"
+  },
+  {
+   "t": 4457.68,
+   "kind": "content",
+   "text": "مو"
+  },
+  {
+   "t": 4474.57,
+   "kind": "content",
+   "text": "عات"
+  },
+  {
+   "t": 4491.46,
+   "kind": "content",
+   "text": " التح"
+  },
+  {
+   "t": 4507.79,
+   "kind": "content",
+   "text": "قق"
+  },
+  {
+   "t": 4524.54,
+   "kind": "content",
+   "text": " الس"
+  },
+  {
+   "t": 4541.58,
+   "kind": "content",
+   "text": "ري"
+  },
+  {
+   "t": 4559.15,
+   "kind": "content",
+   "text": "ع"
+  },
+  {
+   "t": 4577.18,
+   "kind": "content",
+   "text": ":**"
+  },
+  {
+   "t": 4594.09,
+   "kind": "content",
+   "text": " ن"
+  },
+  {
+   "t": 4610.75,
+   "kind": "content",
+   "text": "ستخدم"
+  },
+  {
+   "t": 4627.56,
+   "kind": "content",
+   "text": " ثلاث"
+  },
+  {
+   "t": 4645.07,
+   "kind": "content",
+   "text": " مجمو"
+  },
+  {
+   "t": 4661.69,
+   "kind": "content",
+   "text": "عات"
+  },
+  {
+   "t": 4677.97,
+   "kind": "content",
+   "text": " (`"
+  },
+  {
+   "t": 4694.42,
+   "kind": "content",
+   "text": "set"
+  },
+  {
+   "t": 4712.07,
+   "kind": "content",
+   "text": "`)"
+  },
+  {
+   "t": 4728.7,
+   "kind": "content",
+   "text": " لت"
+  },
+  {
+   "t": 4745.24,
+   "kind": "content",
+   "text": "تبع"
+  },
+  {
+   "t": 4762.29,
+   "kind": "content",
+   "text": " الأ"
+  },
+  {
+   "t": 4778.65,
+   "kind": "content",
+   "text": "عم"
+  },
+  {
+   "t": 4795.18,
+   "kind": "content",
+   "text": "دة"
+  },
+  {
+   "t": 4811.9,
+   "kind": "content",
+   "text": " وال"
+  },
+  {
+   "t": 4828.45,
+   "kind": "content",
+   "text": "قط"
+  },
+  {
+   "t": 4853.85,
+   "kind": "content",
+   "text": "ر"
+  },
+  {
+   "t": 4879.32,
+   "kind": "content",
+   "text": "ين"
+  },
+  {
+   "t": 4897.88,
+   "kind": "content",
+   "text": "،"
+  },
+  {
+   "t": 4915.69,
+   "kind": "content",
+   "text": " مما"
+  },
+  {
+   "t": 4933.01,
+   "kind": "content",
+   "text": " يج"
+  },
+  {
+   "t": 4950.15,
+   "kind": "content",
+   "text": "عل"
+  },
+  {
+   "t": 4967.23,
+   "kind": "content",
+   "text": " التح"
+  },
+  {
+   "t": 4985.38,
+   "kind": "content",
+   "text": "قق"
+  },
+  {
+   "t": 5001.87,
+   "kind": "content",
+   "text": " من"
+  },
+  {
+   "t": 5019.47,
+   "kind": "content",
+   "text": " ص"
+  },
+  {
+   "t": 5036.55,
+   "kind": "content",
+   "text": "حة"
+  },
+  {
+   "t": 5053.86,
+   "kind": "content",
+   "text": " الو"
+  },
+  {
+   "t": 5070.7,
+   "kind": "content",
+   "text": "ضع"
+  },
+  {
+   "t": 5087.89,
+   "kind": "content",
+   "text": "ية"
+  },
+  {
+   "t": 5105.29,
+   "kind": "content",
+   "text": " ب"
+  },
+  {
+   "t": 5123.02,
+   "kind": "content",
+   "text": "ز"
+  },
+  {
+   "t": 5140.6,
+   "kind": "content",
+   "text": "من"
+  },
+  {
+   "t": 5158.14,
+   "kind": "content",
+   "text": " ث"
+  },
+  {
+   "t": 5175.36,
+   "kind": "content",
+   "text": "ابت"
+  },
+  {
+   "t": 5193.11,
+   "kind": "content",
+   "text": " O"
+  },
+  {
+   "t": 5210.28,
+   "kind": "content",
+   "text": "("
+  },
+  {
+   "t": 5226.79,
+   "kind": "content",
+   "text": "1"
+  },
+  {
+   "t": 5243.56,
+   "kind": "content",
+   "text": ").\n"
+  },
+  {
+   "t": 5260.46,
+   "kind": "content",
+   "text": "-"
+  },
+  {
+   "t": 5276.83,
+   "kind": "content",
+   "text": " **"
+  },
+  {
+   "t": 5293.71,
+   "kind": "content",
+   "text": "ال"
+  },
+  {
+   "t": 5309.92,
+   "kind": "content",
+   "text": "قط"
+  },
+  {
+   "t": 5326.88,
+   "kind": "content",
+   "text": "ران"
+  },
+  {
+   "t": 5344.1,
+   "kind": "content",
+   "text": ":"
+  },
+  {
+   "t": 5361.16,
+   "kind": "content",
+   "text": "**\n"
+  },
+  {
+   "t": 5378.05,
+   "kind": "content",
+   "text": " "
+  },
+  {
+   "t": 5394.6,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 5411.68,
+   "kind": "content",
+   "text": " الق"
+  },
+  {
+   "t": 5428.27,
+   "kind": "content",
+   "text": "طر"
+  },
+  {
+   "t": 5444.6,
+   "kind": "content",
+   "text": " الرئيس"
+  },
+  {
+   "t": 5462.48,
+   "kind": "content",
+   "text": "ي"
+  },
+  {
+   "t": 5479.06,
+   "kind": "content",
+   "text": ":"
+  },
+  {
+   "t": 5496.12,
+   "kind": "content",
+   "text": " كل"
+  },
+  {
+   "t": 5513.01,
+   "kind": "content",
+   "text": " خ"
+  },
+  {
+   "t": 5529.99,
+   "kind": "content",
+   "text": "لية"
+  },
+  {
+   "t": 5546.48,
+   "kind": "content",
+   "text": " عليه"
+  },
+  {
+   "t": 5563.17,
+   "kind": "content",
+   "text": " تح"
+  },
+  {
+   "t": 5580.26,
+   "kind": "content",
+   "text": "قق"
+  },
+  {
+   "t": 5596.88,
+   "kind": "content",
+   "text": " `"
+  },
+  {
+   "t": 5614.51,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 5631.39,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 5647.72,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 5663.85,
+   "kind": "content",
+   "text": " ="
+  },
+  {
+   "t": 5680.29,
+   "kind": "content",
+   "text": " ث"
+  },
+  {
+   "t": 5697.59,
+   "kind": "content",
+   "text": "ابت"
+  },
+  {
+   "t": 5713.78,
+   "kind": "content",
+   "text": "`.\n"
+  },
+  {
+   "t": 5734.4,
+   "kind": "content",
+   "text": " "
+  },
+  {
+   "t": 5751.05,
+   "kind": "content",
+   "text": " -"
+  },
+  {
+   "t": 5769.56,
+   "kind": "content",
+   "text": " الق"
+  },
+  {
+   "t": 5786.39,
+   "kind": "content",
+   "text": "طر"
+  },
+  {
+   "t": 5803.09,
+   "kind": "content",
+   "text": " الث"
+  },
+  {
+   "t": 5819.54,
+   "kind": "content",
+   "text": "ان"
+  },
+  {
+   "t": 5836.75,
+   "kind": "content",
+   "text": "وي"
+  },
+  {
+   "t": 5853.72,
+   "kind": "content",
+   "text": ":"
+  },
+  {
+   "t": 5870.44,
+   "kind": "content",
+   "text": " كل"
+  },
+  {
+   "t": 5888.03,
+   "kind": "content",
+   "text": " خ"
+  },
+  {
+   "t": 5905.32,
+   "kind": "content",
+   "text": "لية"
+  },
+  {
+   "t": 5921.36,
+   "kind": "content",
+   "text": " عليه"
+  },
+  {
+   "t": 5937.59,
+   "kind": "content",
+   "text": " تح"
+  },
+  {
+   "t": 5954.29,
+   "kind": "content",
+   "text": "قق"
+  },
+  {
+   "t": 5970.95,
+   "kind": "content",
+   "text": " `"
+  },
+  {
+   "t": 5987.88,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 6012.37,
+   "kind": "content",
+   "text": " +"
+  },
+  {
+   "t": 6042.42,
+   "kind": "content",
+   "text": " col"
+  },
+  {
+   "t": 6042.42,
+   "kind": "content",
+   "text": " ="
+  },
+  {
+   "t": 6042.43,
+   "kind": "content",
+   "text": " ث"
+  },
+  {
+   "t": 6059.21,
+   "kind": "content",
+   "text": "ابت"
+  },
+  {
+   "t": 6075.31,
+   "kind": "content",
+   "text": "`.\n"
+  },
+  {
+   "t": 6091.56,
+   "kind": "content",
+   "text": "-"
+  },
+  {
+   "t": 6108.18,
+   "kind": "content",
+   "text": " عند"
+  },
+  {
+   "t": 6124.95,
+   "kind": "content",
+   "text": " الو"
+  },
+  {
+   "t": 6141.94,
+   "kind": "content",
+   "text": "صول"
+  },
+  {
+   "t": 6159.21,
+   "kind": "content",
+   "text": " إلى"
+  },
+  {
+   "t": 6175.91,
+   "kind": "content",
+   "text": " الص"
+  },
+  {
+   "t": 6192.59,
+   "kind": "content",
+   "text": "ف"
+  },
+  {
+   "t": 6209.96,
+   "kind": "content",
+   "text": " الث"
+  },
+  {
+   "t": 6226.81,
+   "kind": "content",
+   "text": "ام"
+  },
+  {
+   "t": 6244.11,
+   "kind": "content",
+   "text": "ن"
+  },
+  {
+   "t": 6260.94,
+   "kind": "content",
+   "text": " (`"
+  },
+  {
+   "t": 6278.12,
+   "kind": "content",
+   "text": "row"
+  },
+  {
+   "t": 6295.23,
+   "kind": "content",
+   "text": " =="
+  },
+  {
+   "t": 6312.11,
+   "kind": "content",
+   "text": " n"
+  },
+  {
+   "t": 6328.39,
+   "kind": "content",
+   "text": "`)"
+  },
+  {
+   "t": 6345.08,
+   "kind": "content",
+   "text": " ن"
+  },
+  {
+   "t": 6363.02,
+   "kind": "content",
+   "text": "كون"
+  },
+  {
+   "t": 6380.32,
+   "kind": "content",
+   "text": " قد"
+  },
+  {
+   "t": 6398.05,
+   "kind": "content",
+   "text": " وج"
+  },
+  {
+   "t": 6414.39,
+   "kind": "content",
+   "text": "د"
+  },
+  {
+   "t": 6430.94,
+   "kind": "content",
+   "text": "نا"
+  },
+  {
+   "t": 6448.19,
+   "kind": "content",
+   "text": " حل"
+  },
+  {
+   "t": 6464.54,
+   "kind": "content",
+   "text": "ًا"
+  },
+  {
+   "t": 6481.11,
+   "kind": "content",
+   "text": " ص"
+  },
+  {
+   "t": 6497.83,
+   "kind": "content",
+   "text": "حيح"
+  },
+  {
+   "t": 6514.33,
+   "kind": "content",
+   "text": "ًا"
+  },
+  {
+   "t": 6530.67,
+   "kind": "content",
+   "text": "،"
+  },
+  {
+   "t": 6547.22,
+   "kind": "content",
+   "text": " فن"
+  },
+  {
+   "t": 6564.73,
+   "kind": "content",
+   "text": "زيد"
+  },
+  {
+   "t": 6581.11,
+   "kind": "content",
+   "text": " العد"
+  },
+  {
+   "t": 6597.92,
+   "kind": "content",
+   "text": "ّ"
+  },
+  {
+   "t": 6614.52,
+   "kind": "content",
+   "text": "اد"
+  },
+  {
+   "t": 6631.56,
+   "kind": "content",
+   "text": ".\n\n"
+  },
+  {
+   "t": 6648.28,
+   "kind": "content",
+   "text": "##"
+  },
+  {
+   "t": 6666.77,
+   "kind": "content",
+   "text": " الن"
+  },
+  {
+   "t": 6684.4,
+   "kind": "content",
+   "text": "تيجة"
+  },
+  {
+   "t": 6701.88,
+   "kind": "content",
+   "text": "\n\n"
+  },
+  {
+   "t": 6719.25,
+   "kind": "content",
+   "text": "عدد"
+  },
+  {
+   "t": 6736.66,
+   "kind": "content",
+   "text": " الح"
+  },
+  {
+   "t": 6753.09,
+   "kind": "content",
+   "text": "ل"
+  },
+  {
+   "t": 6769.42,
+   "kind": "content",
+   "text": "ول"
+  },
+  {
+   "t": 6786.3,
+   "kind": "content",
+   "text": " الص"
+  },
+  {
+   "t": 6803.2,
+   "kind": "content",
+   "text": "حي"
+  },
+  {
+   "t": 6820.69,
+   "kind": "content",
+   "text": "حة"
+  },
+  {
+   "t": 6837.03,
+   "kind": "content",
+   "text": " ل"
+  },
+  {
+   "t": 6854.34,
+   "kind": "content",
+   "text": "مس"
+  },
+  {
+   "t": 6871.23,
+   "kind": "content",
+   "text": "أ"
+  },
+  {
+   "t": 6887.29,
+   "kind": "content",
+   "text": "لة"
+  },
+  {
+   "t": 6903.21,
+   "kind": "content",
+   "text": " الملك"
+  },
+  {
+   "t": 6919.27,
+   "kind": "content",
+   "text": "ات"
+  },
+  {
+   "t": 6934.97,
+   "kind": "content",
+   "text": " الث"
+  },
+  {
+   "t": 6950.52,
+   "kind": "content",
+   "text": "مان"
+  }
+ ],
+ "ready_s": 0.0
+}

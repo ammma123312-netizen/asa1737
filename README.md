@@ -27,9 +27,21 @@ pinned: false
 | حاوية واحدة | ذاكرة 15 GB، والنموذج (510 GB) يُقرأ من الشبكة دون تنزيله | ≈55 دقيقة | «عاصمة المملكة العربية» (قُطع عند حد الرموز) |
 | A3 | سرب من عاملين (التوزيع لم يكن يعمل بعد) | 2,053 ث | ✅ «عاصمة المملكة العربية السعودية» |
 | A5 | 4 عمال، توزيع حقيقي، اتصال موثّق | 944 ث | ✅ |
-| **A6** | 4 عمال، والخبراء على أقراصهم المحلية | **669 ث** | ✅ |
+| A6 | 4 عمال، والخبراء على أقراصهم المحلية | 669 ث | ✅ |
+| A9 | 19 عاملاً، والخبراء في الذاكرة | 630 ث | ✅ |
 
 في A5 وA6 قرأ المنسّق 1.47 GB فقط من الخبراء بنفسه، مقابل 104 GB في A3، فالعمل وُزّع فعلاً.
+
+### المرحلة B: مسألة الملكات الثماني (19 عاملاً)
+| | |
+|---|---|
+| الثواني لكل رمز | **16.8** (الوسيط)، والتمريرة الواحدة 16.4 ث بعد أن كانت 49 ث في A9 |
+| 400 رمز | 1.9 ساعة |
+| الجواب | دالة بالتراجع، وتشغيلها يطبع **92**. النص انقطع عند حد الـ 400 رمز قبل ذكر العدد، والمرحلة B2 تكمله |
+| الاستقرار | 19 عاملاً متصلون طوال ساعتين، بلا أخطاء |
+| الحساب مقابل الشبكة | 37 ms حساب و181 ms نقل لكل طلب، فالشبكة الآن هي العائق |
+
+التفاصيل والسجلات: [docs/asa/REPORT.md](docs/asa/REPORT.md) و[docs/asa/runs/stage-b/](docs/asa/runs/stage-b/).
 
 ## كيف يعمل
 ```
@@ -61,7 +73,7 @@ pinned: false
 - **حساب الجدوى:** `python -m asa.planner --swarm 19` أو `python -m asa.planner --list`.
 
 ## حدود صريحة
-- **السرعة:** أفضل نتيجة حتى الآن 669 ثانية لـ 8 رموز. العمل جارٍ على وضع الخبراء في الذاكرة والاتصال المباشر بين المشغّلات.
+- **السرعة:** نحو 17 ثانية لكل رمز بجودة كاملة. أغلب الوقت الآن في النقل عبر الوسيط بين المشغّلات.
 - **شروط GitHub:** السرب تجربة تُشغَّل يدوياً لاختبار المشروع، وليس خدمة دائمة.
 - **الخصوصية:** سؤالك المرسَل عبر Issue يظهر علناً في المستودع.
 
@@ -69,7 +81,7 @@ pinned: false
 
 **English summary:** ASA runs DeepSeek-V4.1-Flash (763B, MIT) at native precision with zero cost by spreading
 its experts over free GitHub Actions runners (Colibri cluster mode, OIDC-authenticated links, weights streamed from
-Hugging Face). Best measured run so far: 669 s for 8 tokens with 4 workers, correct answer. Full report:
+Hugging Face). Stage B (19 workers, 8-queens): 16.8 s/token median, 400 tokens in 1.9 h, correct backtracking code that prints 92 (the text hit the 400-token cap just before stating the number; B2 reruns with 440). Network is ~83% of each worker round trip. Full report:
 [docs/asa/REPORT.md](docs/asa/REPORT.md).
 
 ---
