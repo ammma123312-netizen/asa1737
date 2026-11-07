@@ -1,0 +1,19 @@
+[v41] n_mtp_layers is absent from config.json; the checkpoint carries 3 DSpark stages
+[v41] DSpark on: 3 stages, 128 experts (3 routed), 5 tokens per draft
+[v41] 40 layers, 384 experts/layer (6 routed), dim 5120, hc 4, window 128, engram on — loaded in 223.40s
+[CLUSTER] coordinator connected to 19 expert worker(s)
+[gateway] input modalities: text, image
+OpenAI-compatible API listening on http://127.0.0.1:8000/v1
+[api] 127.0.0.1 - "GET /v1/models HTTP/1.1" 200 -
+[api] 127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+[v41] DSpark: 20% of the last 10 drafts accepted (under 60%), pausing for 64 tokens
+[v41] DSpark: 20% of the last 10 drafts accepted (under 60%), pausing for 64 tokens
+[v41] DSpark: 10% of the last 10 drafts accepted (under 60%), pausing for 64 tokens
+[v41] DSpark: 0% of the last 10 drafts accepted (under 60%), pausing for 64 tokens
+[v41] DSpark: 0% of the last 10 drafts accepted (under 60%), pausing for 64 tokens
+[v41] DSpark: 20% of the last 10 drafts accepted (under 60%), pausing for 64 tokens
+[v41] engram table 0 (layer 1): 11928 lookups, 18% cache hits, 9729 rows read (2.6 MB)
+[v41] engram table 1 (layer 14): 11928 lookups, 18% cache hits, 9729 rows read (2.6 MB)
+[v41] expert I/O: 499 misses, 9381.5 MB in 15.00s (0.63 GB/s); prefill 0.0 MB, disk 0.00s, matmul 0.00s, wall 167.18s
+[v41] DSpark: 7 of 23 drafts accepted this turn (60 written)
+[v41] DSpark gate: T(1) 11884.5 ms, rows 2:1.22 3:1.42 4:1.64, rho 0.23, acceptance by position 0.43 0.70 0.33 0.50 0.50; 1 rounds took a plain step

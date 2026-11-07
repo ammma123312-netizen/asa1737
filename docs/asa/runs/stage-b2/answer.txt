@@ -1,0 +1,41 @@
+# حل مسألة الملكات الثماني باستخدام التراجع
+
+```python
+def count_queens(n=8):
+    count = 0
+    cols = set()          # الأعمدة المستخدمة
+    diag1 = set()         # القطر الرئيسي (row - col)
+    diag2 = set()         # القطر الثانوي (row + col)
+
+    def backtrack(row):
+        nonlocal count
+        if row == n:
+            count += 1
+            return
+        for col in range(n):
+            if col in cols or (row - col) in diag1 or (row + col) in diag2:
+                continue
+            cols.add(col); diag1.add(row - col); diag2.add(row + col)
+            backtrack(row + 1)
+            cols.remove(col); diag1.remove(row - col); diag2.remove(row + col)
+
+    backtrack(0)
+    return count
+
+print(count_queens(8))
+```
+
+## شرح مختصر
+
+- **التراجع (Backtracking):** نضع ملكة في كل صف على التوالي، ونجرب كل عمود ممكن.
+- **مجموعات التحقق السريع:** نستخدم ثلاث مجموعات (`set`) لتتبع الأعمدة والقطرين، مما يجعل التحقق من صحة الوضعية بزمن ثابت O(1).
+- **القطران:**
+  - القطر الرئيسي: كل خلية عليه تحقق `row - col = ثابت`.
+  - القطر الثانوي: كل خلية عليه تحقق `row + col = ثابت`.
+- عند الوصول إلى الصف الثامن (`row == n`) نكون قد وجدنا حلًا صحيحًا، فنزيد العدّاد.
+
+## النتيجة
+
+عدد الحلول الصحيحة لمسألة الملكات الثماني هو:
+
+**92**

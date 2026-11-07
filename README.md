@@ -35,13 +35,14 @@ pinned: false
 ### المرحلة B: مسألة الملكات الثماني (19 عاملاً)
 | | |
 |---|---|
-| الثواني لكل رمز | **16.8** (الوسيط)، والتمريرة الواحدة 16.4 ث بعد أن كانت 49 ث في A9 |
-| 400 رمز | 1.9 ساعة |
-| الجواب | دالة بالتراجع، وتشغيلها يطبع **92**. النص انقطع عند حد الـ 400 رمز قبل ذكر العدد، والمرحلة B2 تكمله |
+| الثواني لكل رمز | **11.9 إلى 16.8** (الوسيط)، والتمريرة الواحدة 11.9 إلى 16.4 ث بعد أن كانت 49 ث في A9 |
+| الجواب الكامل | 406 رموز في 84 دقيقة (B2) |
+| الجواب | ✅ دالة بالتراجع، وختم النموذج بـ «عدد الحلول الصحيحة لمسألة الملكات الثماني هو: **92**» |
+| التكرار | أول 400 رمز مطابقة حرفياً بين تشغيلين مستقلين |
 | الاستقرار | 19 عاملاً متصلون طوال ساعتين، بلا أخطاء |
 | الحساب مقابل الشبكة | 37 ms حساب و181 ms نقل لكل طلب، فالشبكة الآن هي العائق |
 
-التفاصيل والسجلات: [docs/asa/REPORT.md](docs/asa/REPORT.md) و[docs/asa/runs/stage-b/](docs/asa/runs/stage-b/).
+التفاصيل والسجلات: [docs/asa/REPORT.md](docs/asa/REPORT.md) و[docs/asa/runs/stage-b/](docs/asa/runs/stage-b/) و[stage-b2](docs/asa/runs/stage-b2/).
 
 ## كيف يعمل
 ```
@@ -73,7 +74,7 @@ pinned: false
 - **حساب الجدوى:** `python -m asa.planner --swarm 19` أو `python -m asa.planner --list`.
 
 ## حدود صريحة
-- **السرعة:** نحو 17 ثانية لكل رمز بجودة كاملة. أغلب الوقت الآن في النقل عبر الوسيط بين المشغّلات.
+- **السرعة:** 12 إلى 17 ثانية لكل رمز بجودة كاملة. أغلب الوقت الآن في النقل عبر الوسيط بين المشغّلات.
 - **شروط GitHub:** السرب تجربة تُشغَّل يدوياً لاختبار المشروع، وليس خدمة دائمة.
 - **الخصوصية:** سؤالك المرسَل عبر Issue يظهر علناً في المستودع.
 
@@ -81,7 +82,7 @@ pinned: false
 
 **English summary:** ASA runs DeepSeek-V4.1-Flash (763B, MIT) at native precision with zero cost by spreading
 its experts over free GitHub Actions runners (Colibri cluster mode, OIDC-authenticated links, weights streamed from
-Hugging Face). Stage B (19 workers, 8-queens): 16.8 s/token median, 400 tokens in 1.9 h, correct backtracking code that prints 92 (the text hit the 400-token cap just before stating the number; B2 reruns with 440). Network is ~83% of each worker round trip. Full report:
+Hugging Face). Stage B/B2 (19 workers, 8-queens): correct backtracking code and the stated answer **92** (406 tokens in 84 min, 11.9 s/token median); the first 400 tokens were identical across two independent runs. Network is ~83% of each worker round trip. Full report:
 [docs/asa/REPORT.md](docs/asa/REPORT.md).
 
 ---
