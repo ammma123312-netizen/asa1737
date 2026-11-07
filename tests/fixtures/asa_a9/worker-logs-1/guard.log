@@ -1,0 +1,11 @@
+[guard] accepted ('127.0.0.1', 59474) job=ammma123312-netizen/asa1737/.github/workflows/asa-swarm.yml@refs/heads/claude/asa-llm-projects-edw488
+[timing] guard ('127.0.0.1', 59474) {"n": 2, "mean_ms": 40.9, "p50_ms": 41.2, "p95_ms": 41.2, "total_s": 0.1}
+[timing] guard ('127.0.0.1', 59474) {"n": 14, "mean_ms": 27.9, "p50_ms": 40.7, "p95_ms": 63.7, "total_s": 0.4}
+[timing] guard ('127.0.0.1', 59474) {"n": 25, "mean_ms": 32.9, "p50_ms": 40.8, "p95_ms": 64.2, "total_s": 0.8}
+[timing] guard ('127.0.0.1', 59474) {"n": 35, "mean_ms": 31.4, "p50_ms": 40.7, "p95_ms": 86.6, "total_s": 1.1}
+[timing] guard ('127.0.0.1', 59474) {"n": 54, "mean_ms": 21.1, "p50_ms": 0.2, "p95_ms": 86.2, "total_s": 1.1}
+[timing] guard ('127.0.0.1', 59474) {"n": 71, "mean_ms": 19.6, "p50_ms": 0.2, "p95_ms": 64.2, "total_s": 1.4}
+[timing] guard ('127.0.0.1', 59474) {"n": 89, "mean_ms": 19.0, "p50_ms": 0.2, "p95_ms": 64.2, "total_s": 1.7}
+[pipe] guard ('127.0.0.1', 59474) -> closed by peer after 7212924 B
+[pipe] guard ('127.0.0.1', 59474) <- closed by peer after 7212164 B
+[timing] guard ('127.0.0.1', 59474) {"n": 95, "mean_ms": 17.9, "p50_ms": 0.2, "p95_ms": 64.2, "total_s": 1.7}

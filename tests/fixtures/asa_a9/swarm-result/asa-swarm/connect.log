@@ -1,0 +1,171 @@
+[connect] 127.0.0.1:19200 -> bore.pub:12227
+[connect] 127.0.0.1:19201 -> bore.pub:34071
+[connect] 127.0.0.1:19202 -> bore.pub:26665
+[connect] 127.0.0.1:19203 -> bore.pub:44680
+[connect] 127.0.0.1:19204 -> bore.pub:26171
+[connect] 127.0.0.1:19205 -> bore.pub:46884
+[connect] 127.0.0.1:19206 -> bore.pub:21293
+[connect] 127.0.0.1:19207 -> bore.pub:40466
+[connect] 127.0.0.1:19208 -> bore.pub:55783
+[connect] 127.0.0.1:19209 -> bore.pub:46520
+[connect] 127.0.0.1:19210 -> bore.pub:3921
+[connect] 127.0.0.1:19211 -> bore.pub:4977
+[connect] 127.0.0.1:19212 -> bore.pub:23742
+[connect] 127.0.0.1:19213 -> bore.pub:43304
+[connect] 127.0.0.1:19214 -> bore.pub:41531
+[connect] 127.0.0.1:19215 -> bore.pub:10782
+[connect] 127.0.0.1:19216 -> bore.pub:36526
+[connect] 127.0.0.1:19217 -> bore.pub:51741
+[connect] 127.0.0.1:19218 -> bore.pub:14385
+[connect] authenticated to bore.pub:46884
+[connect] authenticated to bore.pub:21293
+[connect] authenticated to bore.pub:12227
+[connect] authenticated to bore.pub:10782
+[connect] authenticated to bore.pub:36526
+[connect] authenticated to bore.pub:43304
+[connect] authenticated to bore.pub:14385
+[connect] authenticated to bore.pub:46520
+[connect] authenticated to bore.pub:51741
+[connect] authenticated to bore.pub:34071
+[connect] authenticated to bore.pub:4977
+[connect] authenticated to bore.pub:41531
+[connect] authenticated to bore.pub:3921
+[connect] authenticated to bore.pub:55783
+[connect] authenticated to bore.pub:26171
+[connect] authenticated to bore.pub:23742
+[connect] authenticated to bore.pub:44680
+[connect] authenticated to bore.pub:26665
+[connect] authenticated to bore.pub:40466
+[timing] connect bore.pub:12227 {"n": 2, "mean_ms": 72.3, "p50_ms": 84.5, "p95_ms": 84.5, "total_s": 0.1}
+[timing] connect bore.pub:34071 {"n": 2, "mean_ms": 154.6, "p50_ms": 184.8, "p95_ms": 184.8, "total_s": 0.3}
+[timing] connect bore.pub:26665 {"n": 2, "mean_ms": 246.8, "p50_ms": 253.0, "p95_ms": 253.0, "total_s": 0.5}
+[timing] connect bore.pub:44680 {"n": 2, "mean_ms": 298.0, "p50_ms": 361.7, "p95_ms": 361.7, "total_s": 0.6}
+[timing] connect bore.pub:26171 {"n": 2, "mean_ms": 179.9, "p50_ms": 213.3, "p95_ms": 213.3, "total_s": 0.4}
+[timing] connect bore.pub:46884 {"n": 1, "mean_ms": 45.0, "p50_ms": 45.0, "p95_ms": 45.0, "total_s": 0.0}
+[timing] connect bore.pub:21293 {"n": 1, "mean_ms": 47.3, "p50_ms": 47.3, "p95_ms": 47.3, "total_s": 0.0}
+[timing] connect bore.pub:40466 {"n": 2, "mean_ms": 215.9, "p50_ms": 250.9, "p95_ms": 250.9, "total_s": 0.4}
+[timing] connect bore.pub:55783 {"n": 2, "mean_ms": 189.5, "p50_ms": 225.2, "p95_ms": 225.2, "total_s": 0.4}
+[timing] connect bore.pub:46520 {"n": 2, "mean_ms": 110.0, "p50_ms": 128.5, "p95_ms": 128.5, "total_s": 0.2}
+[timing] connect bore.pub:3921 {"n": 2, "mean_ms": 226.2, "p50_ms": 227.2, "p95_ms": 227.2, "total_s": 0.5}
+[timing] connect bore.pub:4977 {"n": 2, "mean_ms": 211.5, "p50_ms": 241.2, "p95_ms": 241.2, "total_s": 0.4}
+[timing] connect bore.pub:23742 {"n": 2, "mean_ms": 271.1, "p50_ms": 362.3, "p95_ms": 362.3, "total_s": 0.5}
+[timing] connect bore.pub:43304 {"n": 2, "mean_ms": 110.4, "p50_ms": 111.4, "p95_ms": 111.4, "total_s": 0.2}
+[timing] connect bore.pub:41531 {"n": 2, "mean_ms": 291.6, "p50_ms": 294.8, "p95_ms": 294.8, "total_s": 0.6}
+[timing] connect bore.pub:10782 {"n": 2, "mean_ms": 75.8, "p50_ms": 76.2, "p95_ms": 76.2, "total_s": 0.2}
+[timing] connect bore.pub:36526 {"n": 2, "mean_ms": 135.2, "p50_ms": 167.5, "p95_ms": 167.5, "total_s": 0.3}
+[timing] connect bore.pub:51741 {"n": 2, "mean_ms": 169.6, "p50_ms": 173.8, "p95_ms": 173.8, "total_s": 0.3}
+[timing] connect bore.pub:14385 {"n": 2, "mean_ms": 131.3, "p50_ms": 145.1, "p95_ms": 145.1, "total_s": 0.3}
+[timing] connect bore.pub:12227 {"n": 14, "mean_ms": 73.6, "p50_ms": 81.9, "p95_ms": 105.8, "total_s": 1.0}
+[timing] connect bore.pub:34071 {"n": 13, "mean_ms": 196.0, "p50_ms": 181.2, "p95_ms": 334.2, "total_s": 2.5}
+[timing] connect bore.pub:26665 {"n": 12, "mean_ms": 162.4, "p50_ms": 171.8, "p95_ms": 254.0, "total_s": 1.9}
+[timing] connect bore.pub:44680 {"n": 15, "mean_ms": 267.4, "p50_ms": 235.1, "p95_ms": 381.7, "total_s": 4.0}
+[timing] connect bore.pub:26171 {"n": 15, "mean_ms": 237.3, "p50_ms": 254.2, "p95_ms": 350.5, "total_s": 3.6}
+[timing] connect bore.pub:40466 {"n": 9, "mean_ms": 235.1, "p50_ms": 238.3, "p95_ms": 352.7, "total_s": 2.1}
+[timing] connect bore.pub:55783 {"n": 12, "mean_ms": 214.0, "p50_ms": 223.4, "p95_ms": 445.2, "total_s": 2.6}
+[timing] connect bore.pub:46520 {"n": 14, "mean_ms": 159.9, "p50_ms": 132.1, "p95_ms": 321.7, "total_s": 2.2}
+[timing] connect bore.pub:3921 {"n": 14, "mean_ms": 236.2, "p50_ms": 225.3, "p95_ms": 440.1, "total_s": 3.3}
+[timing] connect bore.pub:4977 {"n": 13, "mean_ms": 231.6, "p50_ms": 238.9, "p95_ms": 409.7, "total_s": 3.0}
+[timing] connect bore.pub:23742 {"n": 13, "mean_ms": 249.6, "p50_ms": 245.5, "p95_ms": 362.3, "total_s": 3.2}
+[timing] connect bore.pub:43304 {"n": 15, "mean_ms": 119.7, "p50_ms": 110.8, "p95_ms": 182.8, "total_s": 1.8}
+[timing] connect bore.pub:41531 {"n": 12, "mean_ms": 245.3, "p50_ms": 222.3, "p95_ms": 363.0, "total_s": 2.9}
+[timing] connect bore.pub:10782 {"n": 13, "mean_ms": 86.6, "p50_ms": 76.9, "p95_ms": 163.1, "total_s": 1.1}
+[timing] connect bore.pub:36526 {"n": 11, "mean_ms": 137.8, "p50_ms": 102.8, "p95_ms": 247.0, "total_s": 1.5}
+[timing] connect bore.pub:51741 {"n": 14, "mean_ms": 135.2, "p50_ms": 128.0, "p95_ms": 223.6, "total_s": 1.9}
+[timing] connect bore.pub:14385 {"n": 13, "mean_ms": 133.7, "p50_ms": 144.5, "p95_ms": 216.0, "total_s": 1.7}
+[timing] connect bore.pub:46884 {"n": 13, "mean_ms": 80.9, "p50_ms": 84.2, "p95_ms": 119.2, "total_s": 1.1}
+[timing] connect bore.pub:21293 {"n": 11, "mean_ms": 75.2, "p50_ms": 65.4, "p95_ms": 109.7, "total_s": 0.8}
+[timing] connect bore.pub:12227 {"n": 25, "mean_ms": 78.0, "p50_ms": 82.9, "p95_ms": 106.5, "total_s": 2.0}
+[timing] connect bore.pub:34071 {"n": 25, "mean_ms": 192.1, "p50_ms": 180.8, "p95_ms": 334.2, "total_s": 4.8}
+[timing] connect bore.pub:26665 {"n": 24, "mean_ms": 154.6, "p50_ms": 164.3, "p95_ms": 253.0, "total_s": 3.7}
+[timing] connect bore.pub:44680 {"n": 25, "mean_ms": 261.1, "p50_ms": 235.1, "p95_ms": 379.4, "total_s": 6.5}
+[timing] connect bore.pub:26171 {"n": 27, "mean_ms": 225.8, "p50_ms": 213.3, "p95_ms": 349.3, "total_s": 6.1}
+[timing] connect bore.pub:40466 {"n": 20, "mean_ms": 238.5, "p50_ms": 238.3, "p95_ms": 352.7, "total_s": 4.8}
+[timing] connect bore.pub:46520 {"n": 27, "mean_ms": 160.1, "p50_ms": 132.1, "p95_ms": 283.8, "total_s": 4.3}
+[timing] connect bore.pub:3921 {"n": 26, "mean_ms": 230.1, "p50_ms": 224.5, "p95_ms": 407.8, "total_s": 6.0}
+[timing] connect bore.pub:4977 {"n": 23, "mean_ms": 224.0, "p50_ms": 222.9, "p95_ms": 366.9, "total_s": 5.2}
+[timing] connect bore.pub:23742 {"n": 23, "mean_ms": 227.8, "p50_ms": 235.7, "p95_ms": 344.5, "total_s": 5.2}
+[timing] connect bore.pub:43304 {"n": 27, "mean_ms": 121.6, "p50_ms": 110.1, "p95_ms": 182.8, "total_s": 3.3}
+[timing] connect bore.pub:41531 {"n": 23, "mean_ms": 234.2, "p50_ms": 218.3, "p95_ms": 363.0, "total_s": 5.4}
+[timing] connect bore.pub:36526 {"n": 22, "mean_ms": 124.7, "p50_ms": 102.8, "p95_ms": 179.4, "total_s": 2.7}
+[timing] connect bore.pub:51741 {"n": 27, "mean_ms": 135.7, "p50_ms": 117.8, "p95_ms": 208.7, "total_s": 3.7}
+[timing] connect bore.pub:14385 {"n": 22, "mean_ms": 133.8, "p50_ms": 144.0, "p95_ms": 184.9, "total_s": 2.9}
+[timing] connect bore.pub:55783 {"n": 23, "mean_ms": 243.1, "p50_ms": 223.7, "p95_ms": 443.6, "total_s": 5.6}
+[timing] connect bore.pub:10782 {"n": 25, "mean_ms": 93.2, "p50_ms": 77.6, "p95_ms": 153.9, "total_s": 2.3}
+[timing] connect bore.pub:46884 {"n": 24, "mean_ms": 77.3, "p50_ms": 76.9, "p95_ms": 119.2, "total_s": 1.9}
+[timing] connect bore.pub:21293 {"n": 23, "mean_ms": 80.3, "p50_ms": 68.8, "p95_ms": 111.1, "total_s": 1.8}
+[timing] connect bore.pub:12227 {"n": 35, "mean_ms": 93.7, "p50_ms": 82.9, "p95_ms": 113.2, "total_s": 3.3}
+[timing] connect bore.pub:34071 {"n": 35, "mean_ms": 200.7, "p50_ms": 181.2, "p95_ms": 334.2, "total_s": 7.0}
+[timing] connect bore.pub:26665 {"n": 34, "mean_ms": 156.9, "p50_ms": 164.0, "p95_ms": 254.0, "total_s": 5.3}
+[timing] connect bore.pub:44680 {"n": 37, "mean_ms": 261.0, "p50_ms": 235.1, "p95_ms": 381.7, "total_s": 9.7}
+[timing] connect bore.pub:26171 {"n": 37, "mean_ms": 231.3, "p50_ms": 213.5, "p95_ms": 365.6, "total_s": 8.6}
+[timing] connect bore.pub:40466 {"n": 32, "mean_ms": 222.5, "p50_ms": 236.9, "p95_ms": 350.0, "total_s": 7.1}
+[timing] connect bore.pub:46520 {"n": 35, "mean_ms": 171.5, "p50_ms": 153.5, "p95_ms": 321.7, "total_s": 6.0}
+[timing] connect bore.pub:3921 {"n": 37, "mean_ms": 238.3, "p50_ms": 224.5, "p95_ms": 407.8, "total_s": 8.8}
+[timing] connect bore.pub:4977 {"n": 34, "mean_ms": 225.3, "p50_ms": 238.4, "p95_ms": 366.9, "total_s": 7.7}
+[timing] connect bore.pub:23742 {"n": 33, "mean_ms": 216.4, "p50_ms": 194.2, "p95_ms": 344.5, "total_s": 7.1}
+[timing] connect bore.pub:43304 {"n": 38, "mean_ms": 123.0, "p50_ms": 110.5, "p95_ms": 188.3, "total_s": 4.7}
+[timing] connect bore.pub:41531 {"n": 34, "mean_ms": 240.8, "p50_ms": 222.3, "p95_ms": 407.0, "total_s": 8.2}
+[timing] connect bore.pub:36526 {"n": 33, "mean_ms": 121.8, "p50_ms": 103.6, "p95_ms": 179.4, "total_s": 4.0}
+[timing] connect bore.pub:51741 {"n": 37, "mean_ms": 149.4, "p50_ms": 128.8, "p95_ms": 254.7, "total_s": 5.5}
+[timing] connect bore.pub:14385 {"n": 31, "mean_ms": 127.0, "p50_ms": 117.5, "p95_ms": 185.0, "total_s": 3.9}
+[timing] connect bore.pub:46884 {"n": 34, "mean_ms": 77.0, "p50_ms": 76.9, "p95_ms": 119.2, "total_s": 2.6}
+[timing] connect bore.pub:10782 {"n": 34, "mean_ms": 97.5, "p50_ms": 78.3, "p95_ms": 153.9, "total_s": 3.3}
+[timing] connect bore.pub:21293 {"n": 31, "mean_ms": 82.7, "p50_ms": 73.7, "p95_ms": 125.0, "total_s": 2.6}
+[timing] connect bore.pub:55783 {"n": 33, "mean_ms": 274.3, "p50_ms": 224.2, "p95_ms": 445.2, "total_s": 9.1}
+[timing] connect bore.pub:34071 {"n": 43, "mean_ms": 186.8, "p50_ms": 180.7, "p95_ms": 294.9, "total_s": 8.0}
+[timing] connect bore.pub:26665 {"n": 49, "mean_ms": 140.9, "p50_ms": 125.1, "p95_ms": 253.0, "total_s": 6.9}
+[timing] connect bore.pub:44680 {"n": 48, "mean_ms": 239.3, "p50_ms": 231.4, "p95_ms": 379.4, "total_s": 11.5}
+[timing] connect bore.pub:26171 {"n": 44, "mean_ms": 219.6, "p50_ms": 213.4, "p95_ms": 350.5, "total_s": 9.7}
+[timing] connect bore.pub:46520 {"n": 48, "mean_ms": 150.0, "p50_ms": 128.1, "p95_ms": 321.7, "total_s": 7.2}
+[timing] connect bore.pub:4977 {"n": 47, "mean_ms": 199.3, "p50_ms": 183.2, "p95_ms": 352.7, "total_s": 9.4}
+[timing] connect bore.pub:43304 {"n": 51, "mean_ms": 114.0, "p50_ms": 109.6, "p95_ms": 185.1, "total_s": 5.8}
+[timing] connect bore.pub:41531 {"n": 44, "mean_ms": 222.9, "p50_ms": 217.6, "p95_ms": 378.4, "total_s": 9.8}
+[timing] connect bore.pub:14385 {"n": 41, "mean_ms": 118.5, "p50_ms": 111.2, "p95_ms": 184.9, "total_s": 4.9}
+[timing] connect bore.pub:12227 {"n": 54, "mean_ms": 82.0, "p50_ms": 60.9, "p95_ms": 106.9, "total_s": 4.4}
+[timing] connect bore.pub:23742 {"n": 47, "mean_ms": 196.5, "p50_ms": 186.9, "p95_ms": 305.2, "total_s": 9.2}
+[timing] connect bore.pub:3921 {"n": 50, "mean_ms": 217.3, "p50_ms": 161.3, "p95_ms": 376.7, "total_s": 10.9}
+[timing] connect bore.pub:36526 {"n": 47, "mean_ms": 110.6, "p50_ms": 102.3, "p95_ms": 173.3, "total_s": 5.2}
+[timing] connect bore.pub:40466 {"n": 46, "mean_ms": 195.5, "p50_ms": 180.6, "p95_ms": 334.5, "total_s": 9.0}
+[timing] connect bore.pub:46884 {"n": 53, "mean_ms": 72.7, "p50_ms": 60.6, "p95_ms": 119.2, "total_s": 3.9}
+[timing] connect bore.pub:10782 {"n": 47, "mean_ms": 92.3, "p50_ms": 76.9, "p95_ms": 152.4, "total_s": 4.3}
+[timing] connect bore.pub:21293 {"n": 43, "mean_ms": 78.2, "p50_ms": 65.2, "p95_ms": 116.8, "total_s": 3.4}
+[timing] connect bore.pub:55783 {"n": 48, "mean_ms": 240.8, "p50_ms": 223.3, "p95_ms": 443.6, "total_s": 11.6}
+[timing] connect bore.pub:51741 {"n": 51, "mean_ms": 134.9, "p50_ms": 117.7, "p95_ms": 228.3, "total_s": 6.9}
+[timing] connect bore.pub:26665 {"n": 61, "mean_ms": 135.2, "p50_ms": 100.8, "p95_ms": 242.3, "total_s": 8.2}
+[timing] connect bore.pub:44680 {"n": 64, "mean_ms": 225.2, "p50_ms": 230.9, "p95_ms": 377.4, "total_s": 14.4}
+[timing] connect bore.pub:43304 {"n": 65, "mean_ms": 113.5, "p50_ms": 109.6, "p95_ms": 185.1, "total_s": 7.4}
+[timing] connect bore.pub:34071 {"n": 53, "mean_ms": 181.7, "p50_ms": 180.4, "p95_ms": 294.9, "total_s": 9.6}
+[timing] connect bore.pub:26171 {"n": 57, "mean_ms": 209.3, "p50_ms": 213.1, "p95_ms": 350.5, "total_s": 11.9}
+[timing] connect bore.pub:46520 {"n": 63, "mean_ms": 143.4, "p50_ms": 128.1, "p95_ms": 283.8, "total_s": 9.0}
+[timing] connect bore.pub:4977 {"n": 63, "mean_ms": 188.8, "p50_ms": 169.2, "p95_ms": 295.1, "total_s": 11.9}
+[timing] connect bore.pub:41531 {"n": 55, "mean_ms": 218.4, "p50_ms": 207.3, "p95_ms": 378.4, "total_s": 12.0}
+[timing] connect bore.pub:12227 {"n": 71, "mean_ms": 78.4, "p50_ms": 60.6, "p95_ms": 106.9, "total_s": 5.6}
+[timing] connect bore.pub:23742 {"n": 58, "mean_ms": 190.0, "p50_ms": 186.9, "p95_ms": 305.2, "total_s": 11.0}
+[timing] connect bore.pub:36526 {"n": 63, "mean_ms": 107.0, "p50_ms": 88.4, "p95_ms": 167.9, "total_s": 6.7}
+[timing] connect bore.pub:40466 {"n": 61, "mean_ms": 188.2, "p50_ms": 176.0, "p95_ms": 295.7, "total_s": 11.5}
+[timing] connect bore.pub:3921 {"n": 63, "mean_ms": 217.5, "p50_ms": 161.3, "p95_ms": 372.7, "total_s": 13.7}
+[timing] connect bore.pub:14385 {"n": 51, "mean_ms": 115.6, "p50_ms": 111.2, "p95_ms": 184.9, "total_s": 5.9}
+[timing] connect bore.pub:46884 {"n": 66, "mean_ms": 72.4, "p50_ms": 60.9, "p95_ms": 110.6, "total_s": 4.8}
+[timing] connect bore.pub:10782 {"n": 60, "mean_ms": 90.2, "p50_ms": 76.4, "p95_ms": 152.4, "total_s": 5.4}
+[timing] connect bore.pub:51741 {"n": 69, "mean_ms": 132.2, "p50_ms": 117.7, "p95_ms": 228.3, "total_s": 9.1}
+[timing] connect bore.pub:55783 {"n": 64, "mean_ms": 228.8, "p50_ms": 220.2, "p95_ms": 433.0, "total_s": 14.6}
+[timing] connect bore.pub:21293 {"n": 55, "mean_ms": 76.2, "p50_ms": 65.4, "p95_ms": 116.8, "total_s": 4.2}
+[timing] connect bore.pub:26665 {"n": 77, "mean_ms": 130.9, "p50_ms": 100.9, "p95_ms": 242.3, "total_s": 10.1}
+[timing] connect bore.pub:43304 {"n": 79, "mean_ms": 110.7, "p50_ms": 109.4, "p95_ms": 185.1, "total_s": 8.7}
+[timing] connect bore.pub:44680 {"n": 79, "mean_ms": 216.4, "p50_ms": 168.1, "p95_ms": 377.4, "total_s": 17.1}
+[timing] connect bore.pub:46520 {"n": 78, "mean_ms": 136.6, "p50_ms": 126.0, "p95_ms": 283.8, "total_s": 10.7}
+[timing] connect bore.pub:26171 {"n": 71, "mean_ms": 204.8, "p50_ms": 201.3, "p95_ms": 349.3, "total_s": 14.5}
+[timing] connect bore.pub:4977 {"n": 81, "mean_ms": 183.4, "p50_ms": 169.2, "p95_ms": 294.5, "total_s": 14.9}
+[timing] connect bore.pub:41531 {"n": 71, "mean_ms": 213.2, "p50_ms": 205.3, "p95_ms": 368.6, "total_s": 15.1}
+[timing] connect bore.pub:23742 {"n": 72, "mean_ms": 185.2, "p50_ms": 186.9, "p95_ms": 304.3, "total_s": 13.3}
+[timing] connect bore.pub:36526 {"n": 78, "mean_ms": 106.0, "p50_ms": 102.1, "p95_ms": 167.9, "total_s": 8.3}
+[timing] connect bore.pub:12227 {"n": 89, "mean_ms": 76.0, "p50_ms": 60.5, "p95_ms": 106.6, "total_s": 6.8}
+[timing] connect bore.pub:40466 {"n": 73, "mean_ms": 183.5, "p50_ms": 165.1, "p95_ms": 295.7, "total_s": 13.4}
+[timing] connect bore.pub:34071 {"n": 65, "mean_ms": 177.3, "p50_ms": 180.3, "p95_ms": 293.7, "total_s": 11.5}
+[timing] connect bore.pub:3921 {"n": 77, "mean_ms": 210.7, "p50_ms": 157.3, "p95_ms": 372.7, "total_s": 16.2}
+[timing] connect bore.pub:46884 {"n": 80, "mean_ms": 71.6, "p50_ms": 60.9, "p95_ms": 110.6, "total_s": 5.7}
+[timing] connect bore.pub:14385 {"n": 63, "mean_ms": 113.6, "p50_ms": 111.1, "p95_ms": 178.8, "total_s": 7.2}
+[timing] connect bore.pub:55783 {"n": 78, "mean_ms": 226.5, "p50_ms": 223.1, "p95_ms": 433.0, "total_s": 17.7}
+[timing] connect bore.pub:10782 {"n": 80, "mean_ms": 87.4, "p50_ms": 76.4, "p95_ms": 144.3, "total_s": 7.0}
+[timing] connect bore.pub:51741 {"n": 88, "mean_ms": 124.8, "p50_ms": 100.4, "p95_ms": 223.6, "total_s": 11.0}
+[timing] connect bore.pub:21293 {"n": 69, "mean_ms": 74.4, "p50_ms": 65.0, "p95_ms": 113.8, "total_s": 5.1}
