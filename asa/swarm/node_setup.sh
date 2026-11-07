@@ -61,6 +61,8 @@ echo "[node] Colibrì $ENGINE"
 git -C "$WORK/colibri" checkout -q "$COLIBRI_REF"
 # TCP_NODELAY on the cluster sockets + 32-worker limit (see asa/swarm/patch_colibri.py)
 (cd "$HERE" && python3 -m asa.swarm.patch_colibri "$WORK/colibri/c/deepseek_v41.c")
+# engram rows of a step read concurrently ahead of layer 1 (token-exact; see patch_colibri_engram.py)
+(cd "$HERE" && python3 -m asa.swarm.patch_colibri_engram "$WORK/colibri/c/deepseek_v41.c")
 (cd "$WORK/colibri/c" && ./setup.sh >/dev/null && make -s "$ENGINE")
 if [ "$ENGINE" = "deepseek_v41" ]; then
     (cd "$WORK/colibri" && "$WORK/venv/bin/python" c/tools/prepare_dsv41.py --model "$WORK/view" | tail -1)
