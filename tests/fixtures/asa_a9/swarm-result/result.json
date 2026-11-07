@@ -1,0 +1,9 @@
+{
+ "answer": "عاصمة المملكة العربية السعودية",
+ "wall_s": 630.5,
+ "completion_tokens": 8,
+ "prompt_tokens": 15,
+ "tok_per_s_end_to_end": 0.013,
+ "timings": null,
+ "ready_s": 0.0
+}

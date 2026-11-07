@@ -1,0 +1,13 @@
+[v41] n_mtp_layers is absent from config.json; the checkpoint carries 3 DSpark stages
+[v41] DSpark on: 3 stages, 128 experts (3 routed), 5 tokens per draft
+[v41] 40 layers, 384 experts/layer (6 routed), dim 5120, hc 4, window 128, engram on — loaded in 219.58s
+[CLUSTER] coordinator connected to 19 expert worker(s)
+[gateway] input modalities: text, image
+OpenAI-compatible API listening on http://127.0.0.1:8000/v1
+[api] 127.0.0.1 - "GET /v1/models HTTP/1.1" 200 -
+[v41] engram table 0 (layer 1): 552 lookups, 26% cache hits, 408 rows read (0.1 MB)
+[v41] engram table 1 (layer 14): 552 lookups, 26% cache hits, 408 rows read (0.1 MB)
+[v41] expert I/O: 78 misses, 1466.4 MB in 3.59s (0.41 GB/s); prefill 0.0 MB, disk 0.00s, matmul 0.00s, wall 409.86s
+[v41] DSpark: 5 of 5 drafts accepted this turn (7 written)
+[v41] DSpark gate: T(1) 49030.0 ms, rows 3:1.38 4:2.02, rho 0.34, acceptance by position 0.90 0.80 0.67 0.50 0.50; 0 rounds took a plain step
+[api] 127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
