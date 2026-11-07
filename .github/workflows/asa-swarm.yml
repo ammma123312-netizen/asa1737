@@ -31,7 +31,8 @@ on:
   push:
     # Only the swarm owner's branch starts runs from request.json; helper branches that
     # carry the file would otherwise launch (and pre-empt) full swarm runs.
-    branches: ["claude/asa-llm-projects-edw488", "main"]
+    # Merges into main must not launch a swarm: the merge of PR #1 did (run 12).
+    branches: ["claude/asa-llm-projects-edw488"]
     paths: ["asa/swarm/request.json"]
   issues:
     types: [labeled]
