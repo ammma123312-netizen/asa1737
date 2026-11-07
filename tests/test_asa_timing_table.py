@@ -126,3 +126,33 @@ def test_cli_writes_files(run, tmp_path_factory):
                     "--json", str(out / "t.json")]) == 0
     assert "## (ج)" in (out / "t.md").read_text()
     assert json.loads((out / "t.json").read_text())["workers"][0]["network_s"] == 5.1
+
+
+A9 = __import__("pathlib").Path(__file__).parent / "fixtures" / "asa_a9"
+
+
+@pytest.mark.skipif(not (A9 / "swarm-result" / "engine.err").exists(), reason="A9 fixture absent")
+def test_real_a9_engine_result_and_steps():
+    steps = json.loads((A9 / "jobs.json").read_text())
+    md, d = tt.build(str(A9), steps)
+    assert d["loaded_s"] == 219.58 and d["t1_ms"] == 49030.0
+    assert (d["forwards"], d["t1_equivalent_forwards"]) == (3, 8.4)   # 7 written - 5 accepted + 1
+    assert d["tokens"]["source"] == "wall_s/completion_tokens" and d["tokens"]["s_per_token"] == 78.8
+    assert d["steps"]["coordinator"]["Run the requested task"] == 630.0
+    staging = next(v for k, v in d["steps"]["workers"].items() if k.startswith("Node setup + stage"))
+    assert staging == (136.0, 159.0, 182.0)
+
+
+def test_stage_b_token_stream_and_partial(tmp_path):
+    toks = [{"t": 60.0, "kind": "content", "text": "a"}, {"t": 61.0, "kind": "meta", "text": ""},
+            {"t": 100.0, "kind": "content", "text": "b"}, {"t": 130.0, "kind": "content", "text": "c"}]
+    (tmp_path / "partial.json").write_text(json.dumps(
+        {"tokens": toks, "stopped": True, "finish_reason": "length", "wall_s": 130.0}))
+    (tmp_path / "result.json").write_text(json.dumps({"wall_s": None}))  # run cut short
+    md, d = tt.build(str(tmp_path))
+    t = d["tokens"]
+    assert t["source"] == "partial.json tokens" and t["n"] == 3        # meta item dropped
+    assert (t["first_s"], t["gap_p50"], t["s_per_token"]) == (60.0, 35.0, 43.3)
+    assert (t["stopped"], t["finish_reason"]) == (True, "length")
+    assert "| التوقف · stopped / finish_reason | True / length |" in md
+    assert "no paired guard/connect logs" in md
