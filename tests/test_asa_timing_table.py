@@ -86,6 +86,10 @@ def test_compute_vs_network_maps_workers_by_address(run):
     assert (w1["connect_s"], w1["connect_n"], w1["network_s"]) == (6.8, 89, 5.1)
     assert d["workers"][1]["network_s"] == 10.0 and d["workers"][2]["network_s"] is None
     assert d["totals"] == {"guard_s": 4.1, "connect_s": 19.2, "network_s": 15.1}
+    assert d["connect_all_s"] == 19.2  # worker 3 has no connect timing
+    assert d["slowest_worker"] == {"worker": 2, "addr": "bore.pub:40001", "connect_s": 12.4,
+                                   "guard_s": 2.4, "network_s": 10.0}
+    assert "connect total, all workers (2)" in md and "workers with both guard and connect (2)" in md
     # forwards from DSpark: 8 written - 3 accepted + 1 prefill = 6
     assert (d["forwards"], d["forwards_source"].split()[0]) == (6, "DSpark")
     assert d["per_layer_ms"] == {"guard": round(4100 / 240, 1), "connect": 80.0,
@@ -156,3 +160,12 @@ def test_stage_b_token_stream_and_partial(tmp_path):
     assert (t["stopped"], t["finish_reason"]) == (True, "length")
     assert "| التوقف · stopped / finish_reason | True / length |" in md
     assert "no paired guard/connect logs" in md
+
+
+def test_connect_total_includes_workers_without_guard_log(run):
+    root, steps = run
+    (root / "worker-logs-2" / "guard.log").unlink()     # like A9: only some guard logs kept
+    md, d = tt.build(str(root), steps)
+    assert d["connect_all_s"] == 19.2 and d["totals"]["connect_s"] == 6.8
+    assert "workers with both guard and connect (1)" in md
+    assert d["slowest_worker"]["worker"] == 2 and d["slowest_worker"]["guard_s"] is None

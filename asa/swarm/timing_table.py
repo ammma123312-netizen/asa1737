@@ -281,8 +281,23 @@ def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
                  f"{_f(r['guard_s'])} / {_f(r['guard_n'])} | {_f(r['connect_s'])} / {_f(r['connect_n'])} | "
                  f"{_f(r['network_s'])} |")
     T = data["totals"]
-    L.append(f"| **المجموع · total** | | | **{_f(T['guard_s'])}** | **{_f(T['connect_s'])}** | "
+    paired = sum(1 for r in rows if r["network_s"] is not None)
+    # Every worker's connect time, guard.log or not: before the parallel-batch patch the
+    # coordinator waited on workers one after another, so this sum is the serial wait.
+    conn_all = [r for r in rows if r["connect_s"] is not None]
+    data["connect_all_s"] = round(sum(r["connect_s"] for r in conn_all), 1)
+    L.append(f"| **مجموع الانتظار لكل العمال · connect total, all workers ({len(conn_all)})** | | | "
+             f"| **{_f(data['connect_all_s'])}** | |")
+    L.append(f"| **المجموع للعمال ذوي القياسين · total, workers with both guard and connect "
+             f"({paired})** | | | **{_f(T['guard_s'])}** | **{_f(T['connect_s'])}** | "
              f"**{_f(T['network_s'])}** |")
+    if conn_all:
+        slow = max(conn_all, key=lambda r: r["connect_s"])
+        data["slowest_worker"] = {k: slow[k] for k in ("worker", "addr", "connect_s", "guard_s", "network_s")}
+        L.append(f"\n- أبطأ عامل · slowest worker: **{slow['worker']}** ({slow['addr']}), connect "
+                 f"**{_f(slow['connect_s'])} s**, guard {_f(slow['guard_s'])} s, network "
+                 f"{_f(slow['network_s'])} s. When the coordinator overlaps its requests to all workers "
+                 f"(parallel-batch patch), each layer waits roughly for the slowest worker, not the sum.")
     have_pairs = any(r["network_s"] is not None for r in rows)
     if not have_pairs:
         L.append("\n- لا توجد سجلات guard/connect مقترنة · no paired guard/connect logs found: "
