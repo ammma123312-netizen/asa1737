@@ -93,7 +93,7 @@ def test_compute_vs_network_maps_workers_by_address(run):
     # forwards from DSpark: 8 written - 3 accepted + 1 prefill = 6
     assert (d["forwards"], d["forwards_source"].split()[0]) == (6, "DSpark")
     assert d["per_layer_ms"] == {"guard": round(4100 / 240, 1), "connect": 80.0,
-                                 "network": round(15100 / 240, 1)}
+                                 "network": round(15100 / 240, 1), "connect_all_serial": 80.0}
     assert d["t1_ms"] == 49000.0
     assert "not a per-layer measurement" in md and "ليس قياساً لكل طبقة" in md
 
@@ -145,6 +145,23 @@ def test_real_a9_engine_result_and_steps():
     assert d["steps"]["coordinator"]["Run the requested task"] == 630.0
     staging = next(v for k, v in d["steps"]["workers"].items() if k.startswith("Node setup + stage"))
     assert staging == (136.0, 159.0, 182.0)
+
+
+@pytest.mark.skipif(not (A9 / "worker-logs-1" / "guard.log").exists(), reason="A9 logs absent")
+def test_real_a9_compute_vs_network():
+    md, d = tt.build(str(A9), json.loads((A9 / "jobs.json").read_text()))
+    w = {r["worker"]: r for r in d["workers"]}
+    assert len(w) == 19 and all(r["route"] == "relay" for r in w.values())
+    assert (w[1]["addr"], w[1]["guard_s"], w[1]["guard_n"], w[1]["connect_s"], w[1]["connect_n"],
+            w[1]["network_s"]) == ("bore.pub:12227", 1.7, 95, 6.8, 89, 5.1)
+    assert (w[2]["addr"], w[2]["guard_s"], w[2]["guard_n"], w[2]["connect_s"], w[2]["network_s"]) == \
+        ("bore.pub:34071", 6.2, 70, 11.5, 5.3)
+    assert d["connect_all_s"] == 214.3                     # the serial wait before the patch
+    assert d["totals"] == {"guard_s": 7.9, "connect_s": 18.3, "network_s": 10.4}
+    assert (d["slowest_worker"]["worker"], d["slowest_worker"]["connect_s"]) == (9, 17.7)
+    assert d["per_layer_ms"]["connect_all_serial"] == round(214300 / 120, 1)
+    assert d["stability"]["never_connected"] == [] and d["stability"]["expected"] == 19
+    assert d["stability"]["timeouts"] == 0 and d["stability"]["resource"] == 0
 
 
 def test_stage_b_token_stream_and_partial(tmp_path):

@@ -306,10 +306,14 @@ def build(run_dir: str, steps=None, layers: int = 40) -> tuple[str, dict]:
         per = lambda s: round(1000 * s / (fw * layers), 1)  # noqa: E731
         data["per_layer_ms"] = {"guard": per(tot_g), "connect": per(tot_c), "network": per(tot_c - tot_g)}
         P = data["per_layer_ms"]
-        L += ["", f"متوسط لكل طبقة · per-layer average = totals / ({fw} forwards × {layers} layers), "
+        data["per_layer_ms"]["connect_all_serial"] = per(data["connect_all_s"])
+        L += ["", f"متوسط لكل طبقة · per-layer average = total / ({fw} forwards × {layers} layers), "
                   f"forwards from {fw_src}:",
-              f"- الحساب · compute **{P['guard']} ms**, الانتظار · wait **{P['connect']} ms**, "
-              f"الشبكة · network **{P['network']} ms**"]
+              f"- للعمال ذوي القياسين ({paired}) · summed over the {paired} paired workers: "
+              f"الحساب · compute **{P['guard']} ms**, الانتظار · wait **{P['connect']} ms**, "
+              f"الشبكة · network **{P['network']} ms**",
+              f"- انتظار متسلسل لكل العمال ({len(conn_all)}) · serial wait over all {len(conn_all)} workers: "
+              f"**{P['connect_all_serial']} ms** per layer"]
     if data["t1_ms"]:
         L.append(f"- T(1) من سطر DSpark · from the DSpark gate line: **{data['t1_ms'] / 1000:.1f} s** "
                  f"for one single-row forward")
