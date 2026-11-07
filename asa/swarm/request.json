@@ -1,8 +1,8 @@
 {
- "prompt": "ما هي عاصمة المملكة العربية السعودية؟",
- "ngen": 8,
+ "prompt": "اكتب دالة بايثون تحسب عدد كل حلول مسألة الملكات الثماني (8 ملكات على رقعة 8×8 بحيث لا تهاجم أي ملكة أخرى)، باستخدام التراجع (backtracking)، واذكر في النهاية العدد الصحيح للحلول.",
+ "ngen": 400,
  "workers": 19,
  "relay": "bore,cloudflare",
  "session_minutes": 0,
- "stage": "A9: 19 workers, experts in own tmpfs (A8 EDQUOT fix) + TCP_NODELAY + direct routes + timing"
+ "stage": "B: 8-queens (answer 92), 19 workers, experts in RAM, TCP_NODELAY, engram prefetch"
 }
